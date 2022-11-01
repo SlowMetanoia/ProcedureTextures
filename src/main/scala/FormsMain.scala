@@ -1,66 +1,66 @@
+import FormsMain.ATChooseComponent.ATSub
 import pkg._
 
 import java.awt._
+import java.awt.event.{ MouseAdapter, MouseEvent, MouseMotionAdapter }
 import java.awt.geom.{ AffineTransform, Line2D, Point2D }
 import javax.swing.JComponent
 
 object FormsMain{
-//  val jFrame = JFrameBasics.jFrame
-//
-//  var (r,g,b) = (0,0,0)
-//  val jPanel = new JPanel()
-//  val colorSliders = Seq(
-//    new SliderInit(0,255,0,"red",{value=>   r = value;jPanel.setBackground(new Color(r,g,b))},true),
-//    new SliderInit(0,255,0,"green",{value=> g = value;jPanel.setBackground(new Color(r,g,b))},true),
-//    new SliderInit(0,255,0,"blue",{value=>  b = value;jPanel.setBackground(new Color(r,g,b))},true)
-//    )
-//  jPanel.setBackground(new Color(0,0,0))
-//  jFrame.add(jPanel, BorderLayout.NORTH)
-//  jFrame.add(slidersPanel(colorSliders, "Choose color"), BorderLayout.CENTER)
-//  //jFrame.add(new ColorChoosePanel( (x,y,z)=>{jPanel.setBackground(new Color(x,y,z))},"choose color"), BorderLayout.CENTER)
-//  jFrame.revalidate()
   
   class ATChooseComponent(baseLength:Double) extends JComponent{
-    import math._
-    def getAT(baseLine:Line2D,imageLine:Line2D):AffineTransform = {
-      val xT = new AffineTransform()
-
-      val (x0, y0, x1, y1) = (
-        baseLine.getX1 - baseLine.getX2,
-        baseLine.getY1 - baseLine.getY2,
-        imageLine.getX1 - imageLine.getX2,
-        imageLine.getX1 - imageLine.getX2
-      )
-      val (baseLength, imgLength) = (sqrt(x0 * x0 + y0 * y0), sqrt(x1 * x1 + y1 * y1))
-
-      //вычислим синус и косинус угла поворота
-      val cosFi = (x0*x1 + y0*y1)/(baseLength*imgLength)
-      val sinFi = sqrt(1 - cosFi*cosFi)
-      //аффинное преобразование поворота
-      val rotationT = new AffineTransform(cosFi,-sinFi,sinFi,cosFi,0,0)
-      //аффинное преобразование сжатия
-      val suppressionT = new AffineTransform(baseLength/imgLength,0,0,baseLength/imgLength,0,0)
-      //применим преобразования
-      xT.concatenate(rotationT)
-      xT.concatenate(suppressionT)
-      val newP1 = xT.transform(baseLine.getP1,null)
-      //вычислим оставшийся сдвиг
-      val (dx,dy) = (imageLine.getX1 - newP1.getX,imageLine.getY1 - newP1.getY)
-      //аффинное преобразование сдвига
-      val shiftT = new AffineTransform(0,0,0,0,dx,dy)
-      xT.concatenate(shiftT)
-      xT
-    }
-
+    
+    var atSubs:Seq[ATSub] = Seq.empty
+    
     val baseCut = new Line2D.Double(0,0,baseLength,0)
     
     var pointOne:Option[Point2D] = None
-    var Cut:Option[Line2D] = None
+    var pointTwo:Option[Point2D] = None
     var resultAT:Option[AffineTransform] = None
+    
+    object mousePoint extends Iterator[Point2D]{
+      var pt:Point2D = new Point2D.Double(0,0)
+      def set(e:MouseEvent):Unit = {
+        pt = ownDefaultAT.inverseTransform(e.getPoint,null)
+      }
+      override def hasNext: Boolean = true
+      override def next( ): Point2D = pt
+    }
     
     setMinimumSize(new Dimension(100,100))
     setMaximumSize(new Dimension(700,700))
     setPreferredSize(new Dimension(400,400))
+    
+    addMouseMotionListener(new MouseMotionAdapter {
+      override def mouseMoved( e: MouseEvent ): Unit = {
+        super.mouseMoved(e)
+        mousePoint.set(e)
+        repaint()
+      }
+    })
+    
+    def updateAT(xT:AffineTransform):Unit = {
+      resultAT = Some(xT)
+      atSubs.foreach(_.atChanged(xT))
+    }
+    
+    addMouseListener(new MouseAdapter{
+      override def mouseClicked( e: MouseEvent ): Unit = {
+        super.mouseClicked(e)
+        e.getButton match {
+          case MouseEvent.BUTTON1 =>
+            pointOne = Some(mousePoint.next())
+          case MouseEvent.BUTTON3 =>
+            pointTwo = Some(mousePoint.next())
+          case _ =>
+        }
+        (pointOne,pointTwo) match {
+          case (Some(pt1),Some(pt2)) => updateAT(ATChooseComponent.getAT(baseCut,new Line2D.Double(pt1,pt2)))
+          case _ =>
+        }
+        repaint()
+      }
+    })
     
     def ownDefaultAT: AffineTransform = {
       //начальные границы
@@ -79,6 +79,86 @@ object FormsMain{
       super.paintComponent(g)
       val g2d = g.asInstanceOf[Graphics2D]
       g2d.setTransform(ownDefaultAT)
+      g2d.setStroke(new BasicStroke(0))
+      grid(100).foreach{ line =>
+        if(line.getX1==0 || line.getY1==0) {
+          val stroke = g2d.getStroke
+          g2d.setStroke(new BasicStroke((2.0/ownDefaultAT.getScaleX).toFloat))
+          g2d.draw(line)
+          g2d.setStroke(stroke)
+        }
+        g2d.draw(line)
+      }
+      g2d.setColor(Color.RED)
+      g2d.setStroke(new BasicStroke((2.0/ownDefaultAT.getScaleX).toFloat))
+      g2d.draw(baseCut)
+      g2d.setColor(Color.BLUE)
+      
+      resultAT match {
+        case Some(value) =>
+          g2d.transform(value)
+          g2d.draw(baseCut)
+        case None =>
+          pointTwo match {
+            case None =>
+              pointOne.foreach(pt=> g2d.draw(new Line2D.Double(pt,mousePoint.next())))
+            case Some(ptTwo) =>
+              pointOne.foreach(ptOne=> g2d.draw(new Line2D.Double(ptOne,ptTwo)))
+          }
+      }
+      
+      g2d.setTransform(ownDefaultAT)
+      g2d.setTransform(new AffineTransform(2,0,0,2,0,0))
+      g2d.setColor(Color.DARK_GRAY)
+      g2d.drawString("Левая кнопка мыши - поставить одну точку, правая - другую",10,10)
+    }
+  }
+  object ATChooseComponent{
+    import math._
+    trait ATSub{
+      def atChanged(xT:AffineTransform):Unit
+    }
+    
+    
+    def concatenate(xsT:AffineTransform*):AffineTransform = {
+      val result = new AffineTransform()
+      xsT.foreach(result.concatenate)
+      result
+    }
+    def ->(line:Line2D,xT:AffineTransform):Line2D = {
+      new Line2D.Double(
+        xT.transform(line.getP1,null),
+        xT.transform(line.getP2,null)
+      )
+    }
+    def rotation(cosFi:Double):AffineTransform = {
+      val sinFi = sqrt(1 - cosFi*cosFi)
+      new AffineTransform(cosFi,sinFi,-sinFi,cosFi,0,0)
+    }
+    def scale(nx:Double,my:Double): AffineTransform = {
+      new AffineTransform(nx,0,0,my,0,0)
+    }
+    def shift(dx:Double,dy:Double): AffineTransform = {
+      new AffineTransform(1,0,0,1,dx,dy)
+    }
+    def length(line:Line2D):Double = {
+      val lx = line.getX2 - line.getX1
+      val ly = line.getY2 - line.getY1
+      sqrt(lx*lx + ly*ly)
+    }
+    def getAT(baseLine:Line2D,imageLine:Line2D):AffineTransform = {
+      val (x0, y0, x1, y1) = (
+        baseLine.getX1 - baseLine.getX2,
+        baseLine.getY1 - baseLine.getY2,
+        imageLine.getX1 - imageLine.getX2,
+        imageLine.getX1 - imageLine.getX2
+      )
+      val xT = concatenate(
+        shift(imageLine.getX1,imageLine.getY1),
+        scale(length(imageLine)/length(baseLine),length(imageLine)/length(baseLine)),
+        rotation((x0*x1 + y0*y1)/(length(baseLine)*length(imageLine)))
+        )
+      xT
     }
   }
   
@@ -86,24 +166,51 @@ object FormsMain{
 def main( args: Array[ String ] ): Unit = {
   val frame = JFrameBasics.jFrame
   //относительный размер единицы
-  var unitRelativeSize = 400
+  var unitRelativeSize = 50
   
   val componentCenter = (
     frame.getBounds.width/2,
     frame.getBounds.height/2
   )
-  var gridT = new AffineTransform(1,0,0,-1,componentCenter._1,componentCenter._2)
+  val gridT = new AffineTransform(1,0,0,-1,componentCenter._1,componentCenter._2)
   gridT.concatenate(new AffineTransform(unitRelativeSize,0,0,unitRelativeSize,0,0))
-  val atcc = new ATChooseComponent(1)
-  //println(s"atcc.getAT(new Line2D.Double(0,0,1,0)) = ${atcc.getAT(new Line2D.Double(0,0,1,0),new Line2D.Double(3,4,5,6)).transform(new Point2D.Double(0,0))}")
+  val line0 = new Line2D.Double(0,0,1,0)
+  val line1 = new Line2D.Double(3,4,5,6)
+  val resultTransform = ATChooseComponent.getAT(line0,line1)
+  
+//  val component = new JComponent {
+//    import ATChooseComponent.->
+//    override def paintComponent( g: Graphics ): Unit = {
+//      super.paintComponent(g)
+//      val g2d = g.asInstanceOf[Graphics2D]
+//      g2d.setStroke(new BasicStroke(0))
+//      g2d.setTransform(gridT)
+//
+//      g2d.setColor(Color.GRAY)
+//      grid(10).foreach { line =>
+//        if(line.getX1==0 || line.getY1==0) {
+//          val stroke = g2d.getStroke
+//          g2d.setStroke(new BasicStroke((3.0/unitRelativeSize).toFloat))
+//          g2d.draw(line)
+//          g2d.setStroke(stroke)
+//        }
+//        g2d.draw(line)
+//      }
+//      g2d.setColor(Color.BLUE)
+//
+//      g2d.draw(line0)
+//      //g2d.draw(line1)
+//      g2d.setColor(Color.RED)
+//      g2d.draw(->(line0, resultTransform))
+//    }
+//  }
+  val component = new ATChooseComponent(4)
+  frame.add(
+    component
+  )
+  component.repaint()
+  frame.revalidate()
 }
   
-  def grid(size:Int):Seq[Shape] = {
-    (-size to size).flatMap{ i=>
-      Seq(
-        new Line2D.Double(-size,i,size,i),
-        new Line2D.Double(i,-size,i,size)
-        )
-    }
-  }
+
 }

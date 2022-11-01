@@ -1,9 +1,19 @@
+import java.awt.geom.Line2D
 import java.awt.{ GridBagConstraints, GridBagLayout, Insets, Label }
 import javax.swing.{ JLabel, JPanel, JSlider }
 
 object pkg {
   //ряды
   def series[T](prev: T)(next: T => T): LazyList[T] = prev #:: series(next(prev))(next)
+  //сетка
+  def grid(size:Int):Seq[Line2D] = {
+    (-size to size).flatMap{ i=>
+      Seq(
+        new Line2D.Double(-size,i,size,i),
+        new Line2D.Double(i,-size,i,size)
+        )
+    }
+  }
   //Фабричный метод для констреинта
   def getConstraints(
                       gridx:Int,
