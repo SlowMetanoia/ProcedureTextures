@@ -18,6 +18,7 @@ lazy val root = (project in file("."))
   )
 */
 libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "3.0.0"
+libraryDependencies += "org.scalatest" % "scalatest_2.9.2" % "1.9.2" % "test" withSources() withJavadoc()
 
 Compile / mainClass := Some("ProcTextures")
 

@@ -2,12 +2,11 @@ import FormsMain.ATChooseComponent.ATSub
 import pkg._
 
 import java.awt._
-import java.awt.event.{ MouseAdapter, MouseEvent, MouseMotionAdapter }
-import java.awt.geom.{ AffineTransform, Line2D, Point2D }
+import java.awt.event.{MouseAdapter, MouseEvent, MouseMotionAdapter}
+import java.awt.geom.{AffineTransform, Line2D, Point2D}
 import javax.swing.JComponent
 
 object FormsMain{
-  
   class ATChooseComponent(baseLength:Double) extends JComponent{
     
     var atSubs:Seq[ATSub] = Seq.empty
@@ -131,9 +130,12 @@ object FormsMain{
         xT.transform(line.getP2,null)
       )
     }
-    def rotation(cosFi:Double):AffineTransform = {
-      val sinFi = sqrt(1 - cosFi*cosFi)
-      new AffineTransform(cosFi,sinFi,-sinFi,cosFi,0,0)
+    def rotation(fi:Double):AffineTransform = {
+      new AffineTransform(cos(fi),sin(fi),-sin(fi),cos(fi),0,0)
+    }
+
+    def rotation(cos: Double, sin: Double): AffineTransform = {
+      new AffineTransform(cos, -sin, sin, cos, 0, 0)
     }
     def scale(nx:Double,my:Double): AffineTransform = {
       new AffineTransform(nx,0,0,my,0,0)
@@ -153,10 +155,23 @@ object FormsMain{
         imageLine.getX1 - imageLine.getX2,
         imageLine.getX1 - imageLine.getX2
       )
+      val fi = {
+        val cosFi = (x0*x1 + y0*y1)/(length(baseLine)*length(imageLine))
+        //через косинус
+        val fi0 = acos(cosFi)
+        //через синус
+        val fi1 = acos(cosFi) + Pi/4
+        if(sin(fi1) > 0) fi0 else -fi0
+      }
+      val(rx0,ry0) = (y0,-x0)
       val xT = concatenate(
         shift(imageLine.getX1,imageLine.getY1),
         scale(length(imageLine)/length(baseLine),length(imageLine)/length(baseLine)),
-        rotation((x0*x1 + y0*y1)/(length(baseLine)*length(imageLine)))
+        rotation(
+          fi
+          //(x0*x1 + y0*y1)/(length(baseLine)*length(imageLine)),
+          //(rx0*x1 + ry0*y1)/(length(baseLine)*length(imageLine))
+        )
         )
       xT
     }
