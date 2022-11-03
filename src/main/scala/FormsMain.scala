@@ -161,7 +161,8 @@ object FormsMain{
         val fi0 = acos(cosFi)
         //через синус
         val fi1 = acos(cosFi) + Pi/4
-        if(sin(fi1) > 0) fi0 else -fi0
+        println(fi1)
+        if(cos(fi1) < 0) fi0 else -fi0
       }
       val(rx0,ry0) = (y0,-x0)
       val xT = concatenate(
