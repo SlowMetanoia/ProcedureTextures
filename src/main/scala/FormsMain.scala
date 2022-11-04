@@ -150,21 +150,21 @@ object FormsMain{
     }
     def getAT(baseLine:Line2D,imageLine:Line2D):AffineTransform = {
       val (x0, y0, x1, y1) = (
-        baseLine.getX1 - baseLine.getX2,
-        baseLine.getY1 - baseLine.getY2,
-        imageLine.getX1 - imageLine.getX2,
-        imageLine.getX1 - imageLine.getX2
+        baseLine.getX2 - baseLine.getX1,
+        baseLine.getY2 - baseLine.getY1,
+        imageLine.getX2 - imageLine.getX1,
+        imageLine.getX2 - imageLine.getX1
       )
       val fi = {
-        val cosFi = (x0*x1 + y0*y1)/(length(baseLine)*length(imageLine))
-        //через косинус
-        val fi0 = acos(cosFi)
-        //через синус
-        val fi1 = acos(cosFi) + Pi/4
-        println(fi1)
-        if(cos(fi1) < 0) fi0 else -fi0
+        val sign = if(x0*y1 - y0*x1 >= 0) 1 else -1
+        val value = acos((x0*x1 + y0*y1)/(length(baseLine)*length(imageLine)))
+        var result = sign * value
+
+        println(s"sign   = ${sign}")
+        println(s"value  = ${value}")
+        println(s"result = ${result}")
+        result
       }
-      val(rx0,ry0) = (y0,-x0)
       val xT = concatenate(
         shift(imageLine.getX1,imageLine.getY1),
         scale(length(imageLine)/length(baseLine),length(imageLine)/length(baseLine)),
