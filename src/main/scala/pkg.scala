@@ -1,6 +1,6 @@
 import java.awt.geom.Line2D
-import java.awt.{ GridBagConstraints, GridBagLayout, Insets, Label }
-import javax.swing.{ JLabel, JPanel, JSlider }
+import java.awt.{ Dimension, GridBagConstraints, GridBagLayout, Insets, Label }
+import javax.swing.{ JLabel, JPanel, JSlider, JTextField }
 
 object pkg {
   //ряды
@@ -31,7 +31,23 @@ object pkg {
     new GridBagConstraints(gridx,gridy,gridwidth,gridheight,gridweightx,gridweighty,anchor,fill,insets,ipadx,ipady)
   }
   
-  class SliderInit( min:Int, max:Int, defVal:Int, label:String, se:Int=>Unit, isValueDisplaying:Boolean){
+  class NumberTextField(var initialText:Double,label:String,se:Double=>Unit) extends JPanel{
+    val gridBagLayout = new GridBagLayout
+    setLayout(gridBagLayout)
+    val lc: GridBagConstraints = getConstraints(0, 0, 1, 2)
+    val l = new JLabel(label)
+    val tc: GridBagConstraints = getConstraints(0, 1, 1, 2)
+    val textField = new JTextField()
+    
+    textField.setText(("0"*21 + initialText.toString).takeRight(21))
+    textField.setMinimumSize(new Dimension(40,10))
+    add(l,lc)
+    add(textField, tc)
+    textField.addPropertyChangeListener(_=>{ tfValue.foreach(se)})
+    def tfValue:Option[Double] = textField.getText.toDoubleOption
+  }
+  
+  class SliderInit( min:Int, max:Int, defVal:Int, label:String, se:Int=>Unit, isValueDisplaying:Boolean = true){
     def getSliderPanel: JPanel = {
       
       val panel = new JPanel(new GridBagLayout)
