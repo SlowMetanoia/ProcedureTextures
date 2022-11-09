@@ -1,8 +1,9 @@
+import pkg._
+
 import java.awt.geom.AffineTransform
 import java.awt.{ BasicStroke, Color, Stroke, Toolkit }
 import javax.swing.JFrame
 import scala.swing.Dimension
-import pkg._
 
 object JFrameBasics {
   val jFrame: JFrame = new JFrame()
@@ -44,6 +45,6 @@ object JFrameBasics {
                    dimension.height/2 - windowSize._2/2,
                    windowSize._1,
                    windowSize._2)
-
+  
 }
 

@@ -6,8 +6,6 @@ import scala.swing.Graphics2D
 import pkg._
 
 object SIFMain extends App{
-  //ряды
-  def series[T](prev:T)(next:T=>T):LazyList[T] = prev#::series(next(prev))(next)
   //Всяческий сетап и рисование формочек
   val jFrame = JFrameBasics.jFrame
   val setupTransformation = JFrameBasics.startTransposition
