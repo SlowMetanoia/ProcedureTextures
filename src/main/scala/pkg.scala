@@ -1,10 +1,45 @@
-import java.awt.geom.Line2D
-import java.awt.{ Dimension, GridBagConstraints, GridBagLayout, Insets, Label }
-import javax.swing.{ JLabel, JPanel, JSlider, JTextField }
+import java.awt.geom.{AffineTransform, Line2D}
+import java.awt.{Dimension, GridBagConstraints, GridBagLayout, Insets, Label}
+import javax.swing.{JLabel, JPanel, JSlider, JTextField}
+import scala.math.{cos, sin, sqrt}
 
 object pkg {
   //ряды
   def series[T](prev: T)(next: T => T): LazyList[T] = prev #:: series(next(prev))(next)
+  def iteratorSeries[T](prev: T)(nxt:T=>T):Iterator[T] = new Iterator[T]{
+    private var current:T = prev
+    override def hasNext: Boolean = true
+
+    override def next(): T = {
+      val old = current
+      current = nxt(current)
+      old
+    }
+  }
+
+  def rotation(fi: Double): AffineTransform = {
+    new AffineTransform(cos(fi), sin(fi), -sin(fi), cos(fi), 0, 0)
+  }
+
+  def rotation(cos: Double, sin: Double): AffineTransform = {
+    new AffineTransform(cos, -sin, sin, cos, 0, 0)
+  }
+
+  def scale(nx: Double, my: Double): AffineTransform = {
+    new AffineTransform(nx, 0, 0, my, 0, 0)
+  }
+
+  def shift(dx: Double, dy: Double): AffineTransform = {
+    new AffineTransform(1, 0, 0, 1, dx, dy)
+  }
+
+  def length(line: Line2D): Double = {
+    val lx = line.getX2 - line.getX1
+    val ly = line.getY2 - line.getY1
+    sqrt(lx * lx + ly * ly)
+  }
+
+
   //сетка
   def grid(size:Int):Seq[Line2D] = {
     (-size to size).flatMap{ i=>

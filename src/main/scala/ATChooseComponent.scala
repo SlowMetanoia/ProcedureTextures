@@ -152,24 +152,7 @@ object ATChooseComponent{
       xT.transform(line.getP2,null)
       )
   }
-  def rotation(fi:Double):AffineTransform = {
-    new AffineTransform(cos(fi),sin(fi),-sin(fi),cos(fi),0,0)
-  }
-  
-  def rotation(cos: Double, sin: Double): AffineTransform = {
-    new AffineTransform(cos, -sin, sin, cos, 0, 0)
-  }
-  def scale(nx:Double,my:Double): AffineTransform = {
-    new AffineTransform(nx,0,0,my,0,0)
-  }
-  def shift(dx:Double,dy:Double): AffineTransform = {
-    new AffineTransform(1,0,0,1,dx,dy)
-  }
-  def length(line:Line2D):Double = {
-    val lx = line.getX2 - line.getX1
-    val ly = line.getY2 - line.getY1
-    sqrt(lx*lx + ly*ly)
-  }
+
   def getAT(baseLine:Line2D,imageLine:Line2D):AffineTransform = {
     val (x0, y0, x1, y1) = (
       baseLine.getX2 - baseLine.getX1,
