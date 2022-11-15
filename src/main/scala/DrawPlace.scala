@@ -81,9 +81,11 @@ class DrawPlace(var transform:AffineTransform = null) extends shapesProducer{
       super.paintComponent(g)
       recountTransform()
       val g2d = g.asInstanceOf[ Graphics2D ]
-      g2d.drawString(s"$mousePoint",20,20)
+      g2d.setColor(new Color(0,100,0))
+      g2d.drawString(s"Исходное изображение",20,20)
       g2d.setTransform(transform)
       g2d.setStroke(JFrameBasics.gridStroke)
+      g2d.setColor(Color.BLACK)
       grid(40).foreach {
         line =>
           if(line.intersects(-0.5, -0.5, 0.5, 0.5)) {

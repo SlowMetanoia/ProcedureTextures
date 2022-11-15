@@ -129,7 +129,9 @@ class ATChooseComponent(var baseLength:Double) extends JComponent{
     
     g2d.setTransform(ownDefaultAT)
     g2d.setTransform(new AffineTransform(2,0,0,2,0,0))
-    g2d.setColor(Color.DARK_GRAY)
+    g2d.setColor(new Color(0,100,0))
+    g2d.drawString("Изображённая лини - исходная",10,10)
+    g2d.drawString("Изобразите её образы после преобразований",10,20)
 //    g2d.drawString("ЛКМ - первая точка",10,10)
 //    g2d.drawString("ПКМ - вторая",10,20)
   }
