@@ -62,6 +62,7 @@ class SIFPanel extends JPanel{
 object SIFPanel{
   def main( args: Array[ String ] ): Unit = {
     val jFrame = JFrameBasics.jFrame
+    jFrame.setTitle("System of iterating functions")
     val panel = new SIFPanel
     jFrame.add(panel)
     jFrame.revalidate()

@@ -1,10 +1,10 @@
-import java.awt.geom.{Line2D, Point2D, Rectangle2D}
-import java.awt.{BasicStroke, Color, Graphics}
-import javax.swing.{JButton, JComponent, JLabel, JPanel}
-import scala.swing.Graphics2D
 import pkg._
 
-import scala.math.{Pi, exp, sin}
+import java.awt.geom.{ Line2D, Point2D, Rectangle2D }
+import java.awt.{ BasicStroke, Color, Graphics }
+import javax.swing.{ JButton, JComponent, JLabel, JPanel }
+import scala.math.{ Pi, sin }
+import scala.swing.{ Dimension, Graphics2D }
 import scala.util.Random
 
 object ProcTextures {
@@ -21,6 +21,7 @@ object ProcTextures {
   final object GRADIENT extends TextureMode
   final object WAVES extends TextureMode
   final object LINES extends TextureMode
+  final object GRADIENT_WAVES extends TextureMode
 
 
 
@@ -58,26 +59,22 @@ object ProcTextures {
     var scaleX:Double = 1
     var scaleY:Double = 1
     var shift:Double = 0
-    var mode: TextureMode = GRADIENT
+    var mode: TextureMode = GRADIENT_WAVES
+    var functionDistance = 150
 
     //-----------------------------------------Вспомогательные функции--------------------------------------------------
     def functionLines(f: Double => Double, step: Double): Iterator[Line2D] = {
       series[Point2D](new Point2D.Double(0, f(0)))(pt => new Point2D.Double(pt.getX + step, f(pt.getX + step)))
         .sliding(2).map { case LazyList(pt1, pt2) => new Line2D.Double(pt1, pt2) }
     }
-
-    def drawMultiFuncLines(g2d: Graphics2D,
-                           f: Double => Double,
-                           step: Double,
-                           fColor: Color,
-                           rotationAng: Double,
-                           distance: Double,
-                           stroke: Double = 0): Unit = {
-      val shiftedF = (x: Double) => f(x)
-      //линии функции от x = -1300 до x >= 2600
-      val zeroF = functionLines(shiftedF, step).takeWhile(_.getX1 < 3000)
+    def multiFunctionalLines(
+                              f: Double => Double,
+                              step: Double,
+                              distance: Double,
+                            ):Iterator[Line2D] = {
+      val zeroF = functionLines(f, step).takeWhile(_.getX1 < 3000)
       //сдвиги
-      val shifts = series[Double](-3000)(_ + distance)
+      val shifts = series[Double](0)(_ + distance)
       //линии со сдвигами
       val shifted = zeroF.flatMap { ln =>
         shifts.takeWhile(_ < 3000).map { y =>
@@ -86,15 +83,82 @@ object ProcTextures {
             ln.getY1 + y,
             ln.getX2,
             ln.getY2 + y
-          )
+            )
         }
       }
+      shifted
+    }
+    def gradLines(
+                   f: Double => Double,
+                   step: Double,
+                   distance: Double,
+                   parts: Int
+                 ) = {
+      val zeroF = functionLines(f, step).takeWhile(_.getX1*scaleX < 1000)
+      val gradLines = zeroF.map{ line=>
+        val d = distance/parts
+        for (i<-0 to parts) yield
+          new Line2D.Double(
+            line.getX1,
+            line.getY1 + d*i,
+            line.getX2,
+            line.getY2 + d*i
+            )
+      }
+      gradLines
+    }
+    def drawMultiFuncLines(g2d: Graphics2D,
+                           f: Double => Double,
+                           step: Double,
+                           fColor: Color,
+                           rotationAng: Double,
+                           distance: Double,
+                           stroke: Double = 0): Unit = {
+      val shifted = multiFunctionalLines(f,step, distance)
       val xT = pkg.rotation(rotationAng)
       xT.concatenate(pkg.scale(scaleX,scaleY))
       g2d.setStroke(new BasicStroke(stroke.toFloat))
       g2d.setColor(fColor)
       g2d.setTransform(xT)
       shifted.foreach(g2d.draw)
+    }
+    
+    def drawGradient(g2d: Graphics2D,
+                     f: Double => Double,
+                     step: Double,
+                     fColor: Color,
+                     rotationAng: Double,
+                     distance: Double,
+                     stroke: Double = 0,
+                     parts: Int = 40
+                    ): Unit = {
+      val lines = gradLines(f,step,distance,parts * 2)
+      val shifts = series[Double](0)(_ + distance).takeWhile(_*scaleY<2000)
+      val palette = {
+        val palette = for (i <- 0 until parts) yield new Color(
+          fColor.getRed,
+          fColor.getGreen,
+          fColor.getBlue,
+          ((i.toFloat / parts) * 255).intValue()
+          )
+        palette.reverse ++ palette
+      }
+      
+      val xT = pkg.rotation(rotationAng)
+      xT.concatenate(pkg.scale(scaleX,scaleY))
+      g2d.setStroke(new BasicStroke(stroke.toFloat))
+      g2d.setTransform(xT)
+      lines.foreach{gradLns=>
+        gradLns
+          .zip(palette)
+          .foreach{ case (ln,color)=>
+            g2d.setColor(color)
+            shifts.foreach{shift=>
+              g2d.draw(
+                new Line2D.Double(ln.getX1,
+                                  ln.getY1 + shift,
+                                  ln.getX2,
+                                  ln.getY2 + shift))}}}
     }
 
     //--------------------------------------Раздутая функция отрисовки--------------------------------------------------
@@ -167,6 +231,9 @@ object ProcTextures {
           } if (j % 2 == 0) g2d.draw(rectangle(xs(i), ys(j))) else g2d.draw(rectangle(xs(i) - cellSize * brickShift / 100, ys(j)))
         }
         case GRADIENT => textureDrawer.paintMe = g2d => {
+          
+          //g2d.setTransform(pkg.rotation(rotation))
+          
           g2d.setColor(gridColor)
           g2d.fillRect(-3000, -3000, 6000, 6000)
 
@@ -178,14 +245,20 @@ object ProcTextures {
           }
         }
         case WAVES => textureDrawer.paintMe = g2d=> {
+          val color = cellColor
           g2d.setColor(gridColor)
           g2d.fillRect(-3000, -3000, 6000, 6000)
-          drawMultiFuncLines(g2d,x=>100*sin(x / 50),1,cellColor,rotation,150,outlineWidth)
+          drawMultiFuncLines(g2d,x=>100*sin(x / 50 - 100)-1000,1,cellColor,rotation,functionDistance,outlineWidth)
         }
         case LINES => textureDrawer.paintMe = g2d=>{
           g2d.setColor(gridColor)
           g2d.fillRect(-3000, -3000, 6000, 6000)
-          drawMultiFuncLines(g2d,x=> x,1,cellColor,rotation,150,outlineWidth)
+          drawMultiFuncLines(g2d,x=> x - 1500,1,cellColor,rotation,functionDistance,outlineWidth)
+        }
+        case GRADIENT_WAVES => textureDrawer.paintMe = g2d=>{
+          g2d.setColor(gridColor)
+          g2d.fillRect(-3000, -3000, 6000, 6000)
+          drawGradient(g2d,x=>100*sin(x / 50 - 100)-1000,1,cellColor,rotation,functionDistance,outlineWidth)
         }
       }
       textureDrawer.repaint()
@@ -232,9 +305,16 @@ object ProcTextures {
       mode = LINES
       drawTextures()
     })
+    val gradientWavesButton = new JButton("Gradient Waves")
+    gradientWavesButton.addActionListener(_=>{
+      mode = GRADIENT_WAVES
+      drawTextures()
+    })
 
 
     val buttonsPanel = new JPanel() {
+      setPreferredSize(new Dimension(600,70))
+      //setMinimumSize(new Dimension())
       add(brickButton)
       add(plainColorButton)
       add(gridButton)
@@ -242,6 +322,7 @@ object ProcTextures {
       add(gradientButton)
       add(waveButton)
       add(linesButton)
+      add(gradientWavesButton)
     }
 
     jPanel.add(buttonsPanel)
@@ -268,18 +349,19 @@ object ProcTextures {
       new SliderInit(5, 100, brickHeight, "Brick height", { value => brickHeight = value; textureDrawer.repaint() }, true),
       new SliderInit(0, 100, 50, "Percent of bricks shift", { value => brickShift = value; textureDrawer.repaint() }, true)
     )
-    val atSettingsSliders = Seq(
+    val functionPrintingSliders = Seq(
       new SliderInit(0,90,rotation.intValue(), "Rotation angle",{ value => rotation = Pi/180*value;textureDrawer.repaint()}),
-      new SliderInit(1,999,(scaleX*100).intValue(), "Scale X", {value => scaleX = value/100;textureDrawer.repaint()}),
-      new SliderInit(1,999,(scaleY*100).intValue(), "Scale Y", {value => scaleY = value/100;textureDrawer.repaint()}),
-      new SliderInit(-999,999,shift.intValue(), "Shift", {value => shift = value;textureDrawer.repaint()})
+      new SliderInit(100,999,(scaleX*100).intValue(), "Scale X", {value => scaleX = value/100;textureDrawer.repaint()}),
+      new SliderInit(100,999,(scaleY*100).intValue(), "Scale Y", {value => scaleY = value/100;textureDrawer.repaint()}),
+      //new SliderInit(0,999,shift.intValue(), "Shift", {value => shift = value;textureDrawer.repaint()})
+      new SliderInit(20,500,functionDistance.intValue(),"In between distance",{value => functionDistance = value;textureDrawer.repaint()})
     )
 
-    jPanel.add(slidersPanel(gridColorSliders, "Grid color settings"))
-    jPanel.add(slidersPanel(cellColorSliders, "Cell color settings"))
+    jPanel.add(slidersPanel(gridColorSliders, "Second color"))
+    jPanel.add(slidersPanel(cellColorSliders, "First color"))
     jPanel.add(slidersPanel(cellSettingsSliders, "Cell settings"))
     jPanel.add(slidersPanel(starsColorSliders,"Stars settings"))
-    jPanel.add(slidersPanel(atSettingsSliders,"Some AT Settings"))
+    jPanel.add(slidersPanel(functionPrintingSliders,"Functions printing settings"))
     jPanel.revalidate()
 
     jFrame.setLayout(null)
