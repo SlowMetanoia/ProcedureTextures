@@ -15,6 +15,7 @@ object ProcTextures {
   sealed trait TextureMode
   final object GRID extends TextureMode
   final object BRICKS extends TextureMode
+  final object BRICK extends TextureMode
   final object MULTICOLOR_GRID extends TextureMode {
     var cellColors: Seq[Color] = Seq(
       Color.RED, Color.BLUE, Color.WHITE, Color.CYAN, Color.GREEN, Color.GRAY, Color.MAGENTA, Color.DARK_GRAY
@@ -64,7 +65,7 @@ object ProcTextures {
     var scaleX:Double = 1
     var scaleY:Double = 1
     var shift:Double = 0
-    var mode: TextureMode = FILLING_PULSE
+    var mode: TextureMode = BRICK
     var functionDistance = 150
     
     
@@ -76,7 +77,6 @@ object ProcTextures {
         sleep(tickTime)
         if(mode == FILLING_PULSE || mode == DRAWING_PULSE){
           textureDrawer.repaint()
-          //println("piu")
         }
       }
     }(global)
@@ -219,17 +219,65 @@ object ProcTextures {
         h
       )
     }
-    def MOE(x:Int,lim:Int):Int = if(x>lim) x else lim
-    def LOE(x:Int,lim:Int):Int = if(x<lim) x else lim
-    def drawSpots(
+    def MOE(x:Int,lim:Int):Int = if(x<lim) x else lim
+    def LOE(x:Int,lim:Int):Int = if(x>lim) x else lim
+    def inLim(x:Int,lLim:Int,rLim:Int) = x match {
+      case x:Int if x<lLim => lLim
+      case x:Int if x>rLim => rLim
+      case _ => x
+    }
+    def incLim = inLim(_,0,255)
+    def darkerDistortion:Color=>Color =
+    {case pkg.Color(r,g,b,_) =>
+      val rand = new Random()
+      new Color(
+      LOE(0,r-rand.nextInt(100)),
+      LOE(0,g-rand.nextInt(100)),
+      LOE(0,b-rand.nextInt(100)),
+      100
+      )}
+    def shiftWithRandomRotation(x:Double,y:Double) = {
+      val rand = new Random()
+      val xT = pkg.shift(x,y)
+      xT.concatenate(pkg.rotation(rand.nextDouble() * Pi / 4))
+      xT
+    }
+    def zeroDistortion:Color=>Color = {
+      case pkg.Color(r,g,b,_)=>
+        val rand = new Random()
+        new Color(
+          incLim(r+rand.nextInt(100)-50),
+          incLim(r+rand.nextInt(100)-50),
+          incLim(r+rand.nextInt(100)-50),
+          100
+        )
+    }
+    def spots(
                x:Double,
                y:Double,
                w:Double,
                h:Double,
                trys:Int,
-               minDistance:Double
+               rLimits:(Int,Int)
              ):Seq[Ellipse2D] = {
-      ???
+      val rand = new Random()
+      val canvas = new Rectangle2D.Double(x,y,w,h)
+      
+      var spots = Seq.empty[Ellipse2D]
+      
+      for(_<-0 to trys){
+        //выбираем точку где-нибудь в нашем прямоугольнике
+        val (xx,yy) = (x+rLimits._1+rand.nextDouble()*(w-2*rLimits._1),y+rLimits._1+rand.nextDouble()*(h-2*rLimits._1))
+        //выбираем размеры
+        val (ww,hh) = (
+          rand.nextDouble()*(rLimits._2-rLimits._1)+rLimits._1,
+          rand.nextDouble()*(rLimits._2-rLimits._1)+rLimits._1
+        )
+        spots = spots.appended(
+          new Ellipse2D.Double(xx,yy,ww,hh)
+          )
+      }
+      spots
     }
   
     def drawCement(
@@ -247,32 +295,23 @@ object ProcTextures {
       val r = new Random()
       
       //Закрасим всё.
+      val place = new Rectangle2D.Double(x,y,w,h)
       g2d.setColor(Color)
-      g2d.fill(new Rectangle2D.Double(x,y,w,h))
-      
+      g2d.draw(place)
+      g2d.fill(place)
       //добавим пузырьков
-      var bubbles = Seq.empty[(Double,Double)]
-      for(_<-0 to 1000){
-        val (x,y) = (r.nextDouble()*w,r.nextDouble()*h)
-        if(bubbles.forall(ptDistance(_,(x,y))>bubblesSize*bubblesRarity))
-          bubbles = bubbles.appended((x,y))
-      }
+      val bubbles = spots(x,y,w,h,1000,(1,2))
       g2d.setColor(bubblesColorRule(Color))
-      bubbles.foreach { case ( (x, y) ) =>
-        g2d.draw(new Ellipse2D.Double(x,y,bubblesSize,bubblesSize))
-      }
+      bubbles.foreach(g2d.fill)
       //"скруглим" цемент
-      g2d.setColor(new Color(255,255,255,3))
-      val d = 0.1
-      if(orientation){
-        var i:Double = 0
-        while (i < Pi/2) {
-          if(orientation)
-            g2d.draw(rectByCenter(x + w / 2, y + w / 2, w*cos(i), h))
-          else
-            g2d.draw(rectByCenter(x + w / 2, y + w / 2, w, h*cos(i)))
-          i+=d
-        }
+      g2d.setColor(new Color(0,0,0,3))
+      val d = 0.01
+      
+      var i:Double = 0
+      while (i < Pi/2) {
+        if(orientation) g2d.fill(new Rectangle2D.Double(x,y,w*cos(i),h))//g2d.draw(rectByCenter(x + w / 2, y + h / 2, w*cos(i), h))
+        else g2d.fill(new Rectangle2D.Double(x,y,w,h*cos(i)))//g2d.draw(rectByCenter(x + w / 2, y + h / 2, w, h*cos(i)))
+        i+=d
       }
       
     }
@@ -293,25 +332,25 @@ object ProcTextures {
                  ):Unit = {
       val r = new Random()
       //рисуем цемент
-      def cementDistortion:Color=>Color =
-      {case pkg.Color(r,g,b,_) => new Color(
-        LOE(0,r-50),
-        LOE(0,g-50),
-        LOE(0,b-50),
-        100
-        )}
       //правый слой
       val wd = cementWidth + r.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
-      drawCement(x+w-wd,y,wd,h,g2d,cementColor, 2, 1, orientation = true, cementDistortion)
+      drawCement(x+w-wd,y,wd,h,g2d,cementColor, 2, 1, orientation = true, darkerDistortion)
       //нижний слой
       val hd = cementWidth + r.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
-      drawCement(x,y+h-hd,w,hd,g2d,cementColor, 2, 1, orientation = false, cementDistortion)
+      drawCement(x,y+h-hd,w,hd,g2d,cementColor, 2, 1, orientation = false, darkerDistortion)
       //рисуем кирпич
+      val brick = new Rectangle2D.Double(x,y,w-wd,h-hd)
       g2d.setColor(brickColor)
-      g2d.fill(new Rectangle2D.Double(x,y,w,h))
+      g2d.draw(brick)
+      g2d.fill(brick)
       //рисуем вкрапления
+      val distortions = spots(brick.getX,brick.getY,brick.getWidth,brick.getHeight,300,(2,4))
+      distortions.foreach{d=>
+        g2d.setColor(irregularityColorRule(cellColor))
+        g2d.fill(d)
+      }
       g2d.setColor(crackColorRule(brickColor))
-      //...Если успею
+      
     }
     
     //--------------------------------------Раздутая функция отрисовки--------------------------------------------------
@@ -367,23 +406,37 @@ object ProcTextures {
           val rectangle: (Double, Double) => Rectangle2D = new Rectangle2D.Double(_, _, cellSize, brickHeight)
           val xs = series[Int](0)(_ + cellSize).takeWhile(_ < (textureDrawer.getWidth + cellSize))
           val ys = series[Int](0)(_ + brickHeight).takeWhile(_ < textureDrawer.getHeight)
+          var rect:Rectangle2D = new Rectangle2D.Double(0,0,0,0)
           g2d.setColor(cellColor)
-          for {i <- xs.indices; j <- ys.indices}
-            if (j % 2 == 0) {
-              g2d.fill(rectangle(xs(i), ys(j)))
-            }else {
-              g2d.fill(rectangle(xs(i) - cellSize * brickShift / 100, ys(j)))
-            }
-
+          for {i <- xs.indices; j <- ys.indices} {
+            rect = if(j % 2 == 0) rectangle(xs(i), ys(j))
+                   else rectangle(xs(i) - cellSize * brickShift / 100, ys(j))
+            drawBrick(
+              rect.getX,
+              rect.getY,
+              rect.getWidth,
+              rect.getHeight,
+              g2d,
+              cellColor,
+              gridColor,
+              darkerDistortion,
+              darkerDistortion,
+              0,
+              30,
+              10,
+              4
+              )
+          }
+          
           g2d.setColor(starsColor)
-          textureDrawer.stars(g2d, starNumber)
+          //textureDrawer.stars(g2d, starNumber)
 
-          g2d.setColor(gridColor)
+          /*g2d.setColor(gridColor)
           g2d.setStroke(new BasicStroke(outlineWidth))
           for {
             i <- xs.indices
             j <- ys.indices
-          } if (j % 2 == 0) g2d.draw(rectangle(xs(i), ys(j))) else g2d.draw(rectangle(xs(i) - cellSize * brickShift / 100, ys(j)))
+          } if (j % 2 == 0) g2d.draw(rectangle(xs(i), ys(j))) else g2d.draw(rectangle(xs(i) - cellSize * brickShift / 100, ys(j)))*/
         }
         case GRADIENT => textureDrawer.paintMe = g2d => {
           
@@ -434,6 +487,23 @@ object ProcTextures {
                            g2d.setColor(color)
                            g2d.draw(shape)
                        }
+        }
+        case BRICK => textureDrawer.paintMe = g2d=>{
+          drawBrick(
+            100,
+            100,
+            500,
+            500,
+            g2d,
+            cellColor,
+            gridColor,
+            zeroDistortion,
+            darkerDistortion,
+            0,
+            30,
+            100,
+            4
+            )
         }
       }
       textureDrawer.repaint()
