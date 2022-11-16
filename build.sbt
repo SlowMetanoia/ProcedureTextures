@@ -18,11 +18,11 @@ lazy val root = (project in file("."))
   )
 */
 libraryDependencies += "org.scala-lang.modules" %% "scala-swing" % "3.0.0"
-libraryDependencies += "org.scalatest" % "scalatest_2.9.2" % "1.9.2" % "test" withSources() withJavadoc()
+//libraryDependencies += "org.scalatest" % "scalatest_2.9.2" % "1.9.2" % "test" withSources() withJavadoc()
 
-Compile / mainClass := Some("ProcTextures")
+Compile / mainClass := Some("SIFPanel")
 
-assembly / mainClass := Some("ProcTextures")
+assembly / mainClass := Some("SIFPanel")
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard

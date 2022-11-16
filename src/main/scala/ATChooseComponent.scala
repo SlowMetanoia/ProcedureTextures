@@ -1,5 +1,5 @@
 import ATChooseComponent._
-import pkg._
+import pkg.{ NumberTextField, SliderInit, getConstraints, grid, length, rotation, scale, shift }
 
 import java.awt.event.{ MouseAdapter, MouseEvent, MouseMotionAdapter }
 import java.awt.geom.{ AffineTransform, Line2D, Point2D }
@@ -125,6 +125,7 @@ class ATChooseComponent(var baseLength:Double) extends JComponent{
       case (None,Some(pt2)) =>
         g2d.draw(new Line2D.Double(mousePoint.next(),pt2))
       case (None,None) =>
+      case (Some(_),Some(_))=>
     }
     
     g2d.setTransform(ownDefaultAT)
@@ -190,9 +191,10 @@ object ATChooseComponent{
       
       val chooseComponent = new ATChooseComponent(baseLineLength)
       val displayPanel = new ATDisplayPanel(chooseComponent.setResultAT)
-      
-      
-      
+  
+  
+      def getConstraints( i: Int, i1: Int, i2: Int, i3: Int ): GridBagConstraints = ???
+  
       val paintingConstraints: GridBagConstraints = getConstraints(0, 2, 7, 7)
       val settingsPanelConstraints: GridBagConstraints = getConstraints(0, 0, 2, 7)
       

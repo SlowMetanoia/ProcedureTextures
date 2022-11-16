@@ -1,7 +1,7 @@
-import java.awt.geom.{AffineTransform, Line2D}
-import java.awt.{Dimension, GridBagConstraints, GridBagLayout, Insets, Label}
-import javax.swing.{JLabel, JPanel, JSlider, JTextField}
-import scala.math.{cos, sin, sqrt}
+import java.awt.geom.{ AffineTransform, Line2D }
+import java.awt.{ Color, Dimension, GridBagConstraints, GridBagLayout, Insets, Label }
+import javax.swing.{ JLabel, JPanel, JSlider, JTextField }
+import scala.math.{ cos, sin, sqrt }
 
 object pkg {
   //ряды
@@ -16,7 +16,11 @@ object pkg {
       old
     }
   }
-
+  object Color{
+    def unapply( arg: Color ): Option[(Int,Int,Int,Int)] = {
+      Some((arg.getRed,arg.getGreen,arg.getBlue,arg.getAlpha))
+    }
+  }
   def rotation(fi: Double): AffineTransform = {
     new AffineTransform(cos(fi), sin(fi), -sin(fi), cos(fi), 0, 0)
   }

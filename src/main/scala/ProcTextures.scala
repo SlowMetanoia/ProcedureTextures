@@ -1,9 +1,12 @@
 import pkg._
 
-import java.awt.geom.{ Line2D, Point2D, Rectangle2D }
+import java.awt.geom.{ Ellipse2D, Line2D, Point2D, Rectangle2D }
 import java.awt.{ BasicStroke, Color, Graphics }
+import java.lang.Thread.sleep
 import javax.swing.{ JButton, JComponent, JLabel, JPanel }
-import scala.math.{ Pi, sin }
+import scala.concurrent.ExecutionContext._
+import scala.concurrent.Future
+import scala.math.{ Pi, cos, sin, sqrt }
 import scala.swing.{ Dimension, Graphics2D }
 import scala.util.Random
 
@@ -22,7 +25,9 @@ object ProcTextures {
   final object WAVES extends TextureMode
   final object LINES extends TextureMode
   final object GRADIENT_WAVES extends TextureMode
-
+  final object FILLING_PULSE extends TextureMode
+  final object DRAWING_PULSE extends TextureMode
+ 
 
 
   //-------------------------------------------Рисовальщик текстур----------------------------------------------------
@@ -59,9 +64,52 @@ object ProcTextures {
     var scaleX:Double = 1
     var scaleY:Double = 1
     var shift:Double = 0
-    var mode: TextureMode = GRADIENT_WAVES
+    var mode: TextureMode = FILLING_PULSE
     var functionDistance = 150
-
+    
+    
+    //-----------------------------------------------Дополнительные фишки для пульсации---------------------------------
+  
+    var tickTime = 10
+    val pulse = Future[Unit]{
+      while(true){
+        sleep(tickTime)
+        if(mode == FILLING_PULSE || mode == DRAWING_PULSE){
+          textureDrawer.repaint()
+          //println("piu")
+        }
+      }
+    }(global)
+    
+    var pulseDiff = 1
+    var colorDiff = 5
+    val pulsingValues = {
+      val initial = new Ellipse2D.Double(350, 350, 1, 1)
+      def initialColor = cellColor
+      val initColorItr: Iterator[Color ] = new Iterator[Color]{
+        var alfa = 255
+        override def hasNext: Boolean = true
+        override def next( ): Color = {
+          alfa = (alfa + 2*colorDiff)%255
+          initialColor match {
+            case pkg.Color(r,g,b,_)=>
+              new Color(r,g,b, alfa)
+          }
+        }
+      }
+      iteratorSeries[ Seq[ (Ellipse2D,Color) ] ](Seq((initial,initialColor))){ shapes=>
+        shapes.map{
+          case(ellipse,color) =>
+            (
+              new Ellipse2D.Double(ellipse.getX-pulseDiff.toFloat/2,
+                                   ellipse.getY-pulseDiff.toFloat/2,
+                                   ellipse.getWidth + pulseDiff,
+                                   ellipse.getHeight + pulseDiff),
+              color match { case pkg.Color(r,g,b,a) => new Color(r,g,b,(a+colorDiff)%255) }
+            )
+        }.appended((initial,initColorItr.next())).filter{case(ellipse,_)=>ellipse.getWidth<1050}
+      }
+    }
     //-----------------------------------------Вспомогательные функции--------------------------------------------------
     def functionLines(f: Double => Double, step: Double): Iterator[Line2D] = {
       series[Point2D](new Point2D.Double(0, f(0)))(pt => new Point2D.Double(pt.getX + step, f(pt.getX + step)))
@@ -160,7 +208,112 @@ object ProcTextures {
                                   ln.getX2,
                                   ln.getY2 + shift))}}}
     }
-
+    //--------------------------------------------Кирпичный заводик-----------------------------------------------------
+    def sqr(d: Double):Double = d*d
+    def ptDistance(pt1:(Double,Double),pt2:(Double,Double)) = sqrt(sqr(pt2._1 - pt1._1) + sqr(pt2._2-pt1._2))
+    def rectByCenter(x:Double,y:Double,w:Double,h:Double):Rectangle2D = {
+      new Rectangle2D.Double(
+        x-w/2,
+        y-h/2,
+        w,
+        h
+      )
+    }
+    def MOE(x:Int,lim:Int):Int = if(x>lim) x else lim
+    def LOE(x:Int,lim:Int):Int = if(x<lim) x else lim
+    def drawSpots(
+               x:Double,
+               y:Double,
+               w:Double,
+               h:Double,
+               trys:Int,
+               minDistance:Double
+             ):Seq[Ellipse2D] = {
+      ???
+    }
+  
+    def drawCement(
+                    x:Double,
+                    y:Double,
+                    w:Double,
+                    h:Double,
+                    g2d: Graphics2D,
+                    Color:Color,
+                    bubblesSize:Double,
+                    bubblesRarity:Double,
+                    orientation:Boolean,
+                    bubblesColorRule:Color=>Color,
+                  ):Unit = {
+      val r = new Random()
+      
+      //Закрасим всё.
+      g2d.setColor(Color)
+      g2d.fill(new Rectangle2D.Double(x,y,w,h))
+      
+      //добавим пузырьков
+      var bubbles = Seq.empty[(Double,Double)]
+      for(_<-0 to 1000){
+        val (x,y) = (r.nextDouble()*w,r.nextDouble()*h)
+        if(bubbles.forall(ptDistance(_,(x,y))>bubblesSize*bubblesRarity))
+          bubbles = bubbles.appended((x,y))
+      }
+      g2d.setColor(bubblesColorRule(Color))
+      bubbles.foreach { case ( (x, y) ) =>
+        g2d.draw(new Ellipse2D.Double(x,y,bubblesSize,bubblesSize))
+      }
+      //"скруглим" цемент
+      g2d.setColor(new Color(255,255,255,3))
+      val d = 0.1
+      if(orientation){
+        var i:Double = 0
+        while (i < Pi/2) {
+          if(orientation)
+            g2d.draw(rectByCenter(x + w / 2, y + w / 2, w*cos(i), h))
+          else
+            g2d.draw(rectByCenter(x + w / 2, y + w / 2, w, h*cos(i)))
+          i+=d
+        }
+      }
+      
+    }
+    def drawBrick(
+                   x:Double,
+                   y:Double,
+                   w:Double,
+                   h:Double,
+                   g2d: Graphics2D,
+                   brickColor:Color,
+                   cementColor:Color,
+                   irregularityColorRule:Color=>Color,
+                   crackColorRule:Color=>Color,
+                   crackChance:Double,
+                   brickColorDeviation:Int,
+                   cementWidth:Double,
+                   cementWidthDeviation:Double
+                 ):Unit = {
+      val r = new Random()
+      //рисуем цемент
+      def cementDistortion:Color=>Color =
+      {case pkg.Color(r,g,b,_) => new Color(
+        LOE(0,r-50),
+        LOE(0,g-50),
+        LOE(0,b-50),
+        100
+        )}
+      //правый слой
+      val wd = cementWidth + r.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
+      drawCement(x+w-wd,y,wd,h,g2d,cementColor, 2, 1, orientation = true, cementDistortion)
+      //нижний слой
+      val hd = cementWidth + r.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
+      drawCement(x,y+h-hd,w,hd,g2d,cementColor, 2, 1, orientation = false, cementDistortion)
+      //рисуем кирпич
+      g2d.setColor(brickColor)
+      g2d.fill(new Rectangle2D.Double(x,y,w,h))
+      //рисуем вкрапления
+      g2d.setColor(crackColorRule(brickColor))
+      //...Если успею
+    }
+    
     //--------------------------------------Раздутая функция отрисовки--------------------------------------------------
 
 
@@ -215,10 +368,12 @@ object ProcTextures {
           val xs = series[Int](0)(_ + cellSize).takeWhile(_ < (textureDrawer.getWidth + cellSize))
           val ys = series[Int](0)(_ + brickHeight).takeWhile(_ < textureDrawer.getHeight)
           g2d.setColor(cellColor)
-          for {
-            i <- xs.indices
-            j <- ys.indices
-          } if (j % 2 == 0) g2d.fill(rectangle(xs(i), ys(j))) else g2d.fill(rectangle(xs(i) - cellSize * brickShift / 100, ys(j)))
+          for {i <- xs.indices; j <- ys.indices}
+            if (j % 2 == 0) {
+              g2d.fill(rectangle(xs(i), ys(j)))
+            }else {
+              g2d.fill(rectangle(xs(i) - cellSize * brickShift / 100, ys(j)))
+            }
 
           g2d.setColor(starsColor)
           textureDrawer.stars(g2d, starNumber)
@@ -259,6 +414,26 @@ object ProcTextures {
           g2d.setColor(gridColor)
           g2d.fillRect(-3000, -3000, 6000, 6000)
           drawGradient(g2d,x=>100*sin(x / 50 - 100)-1000,1,cellColor,rotation,functionDistance,outlineWidth)
+        }
+        case FILLING_PULSE => textureDrawer.paintMe = g2d=>{
+          g2d.setColor(gridColor)
+          g2d.fillRect(-3000, -3000, 6000, 6000)
+          pulsingValues.next()
+                       .foreach{
+                         case(shape,color)=>
+                           g2d.setColor(color)
+                           g2d.fill(shape)
+                       }
+        }
+        case DRAWING_PULSE => textureDrawer.paintMe = g2d=>{
+          g2d.setColor(gridColor)
+          g2d.fillRect(-3000, -3000, 6000, 6000)
+          pulsingValues.next()
+                       .foreach{
+                         case(shape,color)=>
+                           g2d.setColor(color)
+                           g2d.draw(shape)
+                       }
         }
       }
       textureDrawer.repaint()
@@ -310,6 +485,16 @@ object ProcTextures {
       mode = GRADIENT_WAVES
       drawTextures()
     })
+    val fillingPulseButton = new JButton("Filling Pulse")
+    fillingPulseButton.addActionListener(_=>{
+      mode = FILLING_PULSE
+      drawTextures()
+    })
+    val drawingPulseButton = new JButton("Countering Pulse")
+    drawingPulseButton.addActionListener(_=>{
+      mode = DRAWING_PULSE
+      drawTextures()
+    })
 
 
     val buttonsPanel = new JPanel() {
@@ -317,12 +502,14 @@ object ProcTextures {
       //setMinimumSize(new Dimension())
       add(brickButton)
       add(plainColorButton)
-      add(gridButton)
-      add(multicolorGridButton)
-      add(gradientButton)
+      //add(gridButton)
+      //add(multicolorGridButton)
+      //add(gradientButton)
       add(waveButton)
-      add(linesButton)
+      //add(linesButton)
       add(gradientWavesButton)
+      add(fillingPulseButton)
+      add(drawingPulseButton)
     }
 
     jPanel.add(buttonsPanel)
@@ -356,19 +543,27 @@ object ProcTextures {
       //new SliderInit(0,999,shift.intValue(), "Shift", {value => shift = value;textureDrawer.repaint()})
       new SliderInit(20,500,functionDistance.intValue(),"In between distance",{value => functionDistance = value;textureDrawer.repaint()})
     )
+    
+    val pulseSliders = Seq(
+      new SliderInit(0,300,tickTime,"Tick time",{value=> tickTime = value}),
+      new SliderInit(1,50,colorDiff,"Color change speed",{value=> colorDiff = value}),
+      new SliderInit(1,50,pulseDiff,"Pulse step",{value=> pulseDiff = value}),
+    )
 
     jPanel.add(slidersPanel(gridColorSliders, "Second color"))
     jPanel.add(slidersPanel(cellColorSliders, "First color"))
     jPanel.add(slidersPanel(cellSettingsSliders, "Cell settings"))
     jPanel.add(slidersPanel(starsColorSliders,"Stars settings"))
     jPanel.add(slidersPanel(functionPrintingSliders,"Functions printing settings"))
+    jPanel.add(slidersPanel(pulseSliders,"Pulse settings"))
     jPanel.revalidate()
 
     jFrame.setLayout(null)
     jFrame.add(textureDrawer)
     jFrame.add(jPanel)
-
+    
     drawTextures()
+    jPanel.revalidate()
     jFrame.revalidate()
     jFrame.setTitle("Procedure Textures")
   }
