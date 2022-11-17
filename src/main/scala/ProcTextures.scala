@@ -447,8 +447,13 @@ object ProcTextures {
         g2d.setColor(crackColorRule(brickColor))
         g2d.setStroke(new BasicStroke((crackWidth).toFloat))
         
-        crack(brick, rand.nextInt(maximumCrackBrakes+1), crackLine).foreach(g2d.draw)
-        
+        val crackLines = crack(brick, rand.nextInt(maximumCrackBrakes+1), crackLine).flatMap{ crackLine=>
+          val randomPoint = rPoints.take(points._2).appendedAll(rPoints.takeRight(rPoints.length - points._2))(rand.nextInt(3))
+          crack(brick,
+                rand.nextInt(maximumCrackBrakes+1),
+                new Line2D.Double(crackLine.getP2,randomPoint)).appended(crackLine)
+        }
+        if(crackLines.forall(cl=>brick.contains(cl.getBounds))) crackLines.foreach(g2d.draw)
       }
     }
     
