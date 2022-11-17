@@ -1,13 +1,14 @@
 import pkg._
 
-import java.awt.geom.{ Ellipse2D, Line2D, Point2D, Rectangle2D }
-import java.awt.{ BasicStroke, Color, Graphics }
+import java.awt.geom.{Ellipse2D, Line2D, Point2D, Rectangle2D}
+import java.awt.{BasicStroke, Color, Graphics}
 import java.lang.Thread.sleep
-import javax.swing.{ JButton, JComponent, JLabel, JPanel }
+import javax.swing.{JButton, JComponent, JLabel, JPanel}
+import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext._
 import scala.concurrent.Future
-import scala.math.{ Pi, cos, sin, sqrt }
-import scala.swing.{ Dimension, Graphics2D }
+import scala.math.{Pi, cos, sin, sqrt}
+import scala.swing.{Dimension, Graphics2D}
 import scala.util.Random
 
 object ProcTextures {
@@ -252,6 +253,14 @@ object ProcTextures {
           100
         )
     }
+
+    def lineVectorHalf(line: Line2D): Line2D = {
+      val centralPoint = new Point2D.Double(
+        (line.getX2 - line.getX1) / 2,
+        (line.getY2 - line.getY1) / 2
+      )
+      new Line2D.Double(new Point2D.Double(0,0), centralPoint)
+    }
     def spots(
                x:Double,
                y:Double,
@@ -279,7 +288,44 @@ object ProcTextures {
       }
       spots
     }
-  
+    def crack(x: Double,
+              y: Double,
+              w: Double,
+              h: Double,
+              parts:Int,
+              line:Line2D
+             ):Seq[Line2D] = {
+      val bounds = new Rectangle2D.Double(x,y,w,h)
+      val rand = new Random()
+      @tailrec
+      def crackStep(
+                     x: Double,
+                     y: Double,
+                     w: Double,
+                     h: Double,
+                     line: Line2D
+                   ):Seq[Line2D] = {
+        val fi = Pi * (rand.nextDouble() - 1.0 / 2)
+        val xT = pkg.shift(line.getX1, line.getY1)
+        xT.concatenate(pkg.rotation(fi))
+        val ln = ATChooseComponent.applyTransform(lineVectorHalf(line), xT)
+        if (bounds.contains(ln.getBounds2D))
+          Seq(ln, new Line2D.Double(ln.getP2, line.getP2))
+        else
+          crackStep(x, y, w, h, line)
+      }
+      parts match {
+        case x:Int if(x<0) => throw new IllegalArgumentException("parts number must be positive")
+        case 0 => Seq()
+        case 1 => Seq(line)
+        case 2 => crackStep(x,y,w,h,line)
+        case x:Int =>
+          crackStep(x,y,w,h,line) match {
+            case Seq(ln1,ln2) =>
+              crack(x,y,w,h,x/2,ln1).appendedAll(crack(x,y,w,h,x-x/2,ln2))
+          }
+      }
+    }
     def drawCement(
                     x:Double,
                     y:Double,
@@ -326,31 +372,46 @@ object ProcTextures {
                    irregularityColorRule:Color=>Color,
                    crackColorRule:Color=>Color,
                    crackChance:Double,
-                   brickColorDeviation:Int,
+                   brickColorDeviation:Double,
                    cementWidth:Double,
                    cementWidthDeviation:Double
                  ):Unit = {
-      val r = new Random()
+      val rand = new Random()
       //рисуем цемент
       //правый слой
-      val wd = cementWidth + r.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
+      val wd = cementWidth + rand.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
       drawCement(x+w-wd,y,wd,h,g2d,cementColor, 2, 1, orientation = true, darkerDistortion)
       //нижний слой
-      val hd = cementWidth + r.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
+      val hd = cementWidth + rand.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
       drawCement(x,y+h-hd,w,hd,g2d,cementColor, 2, 1, orientation = false, darkerDistortion)
+
+      val finalBrickColor = {
+        brickColor match {
+          case pkg.Color(r,g,b,_)=>
+            new Color(
+              incLim(r+(rand.nextDouble()*r*brickColorDeviation).intValue()),
+              incLim(g+(rand.nextDouble()*g*brickColorDeviation).intValue()),
+              incLim(b+(rand.nextDouble()*b*brickColorDeviation).intValue())
+            )
+        }
+      }
+
       //рисуем кирпич
       val brick = new Rectangle2D.Double(x,y,w-wd,h-hd)
-      g2d.setColor(brickColor)
+      g2d.setColor(finalBrickColor)
       g2d.draw(brick)
       g2d.fill(brick)
       //рисуем вкрапления
       val distortions = spots(brick.getX,brick.getY,brick.getWidth,brick.getHeight,300,(2,4))
       distortions.foreach{d=>
-        g2d.setColor(irregularityColorRule(cellColor))
+        g2d.setColor(irregularityColorRule(finalBrickColor))
         g2d.fill(d)
       }
+      //C некоторым шансом, рисуем трещину
       g2d.setColor(crackColorRule(brickColor))
-      
+      if(rand.nextDouble()<crackChance){
+
+      }
     }
     
     //--------------------------------------Раздутая функция отрисовки--------------------------------------------------
@@ -422,10 +483,10 @@ object ProcTextures {
               darkerDistortion,
               darkerDistortion,
               0,
-              30,
+              0.1,
               10,
               4
-              )
+            )
           }
           
           g2d.setColor(starsColor)
@@ -500,7 +561,7 @@ object ProcTextures {
             zeroDistortion,
             darkerDistortion,
             0,
-            30,
+            0.1,
             100,
             4
             )

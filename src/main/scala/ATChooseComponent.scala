@@ -149,7 +149,7 @@ object ATChooseComponent{
     xsT.foreach(result.concatenate)
     result
   }
-  def ->(line:Line2D,xT:AffineTransform):Line2D = {
+  def applyTransform(line:Line2D, xT:AffineTransform):Line2D = {
     new Line2D.Double(
       xT.transform(line.getP1,null),
       xT.transform(line.getP2,null)
@@ -191,9 +191,7 @@ object ATChooseComponent{
       
       val chooseComponent = new ATChooseComponent(baseLineLength)
       val displayPanel = new ATDisplayPanel(chooseComponent.setResultAT)
-  
-  
-      def getConstraints( i: Int, i1: Int, i2: Int, i3: Int ): GridBagConstraints = ???
+
   
       val paintingConstraints: GridBagConstraints = getConstraints(0, 2, 7, 7)
       val settingsPanelConstraints: GridBagConstraints = getConstraints(0, 0, 2, 7)
