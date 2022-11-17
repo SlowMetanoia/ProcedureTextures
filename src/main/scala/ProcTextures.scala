@@ -1,14 +1,14 @@
 import pkg._
 
-import java.awt.geom.{Ellipse2D, Line2D, Point2D, Rectangle2D}
-import java.awt.{BasicStroke, Color, Graphics}
+import java.awt.geom.{ Ellipse2D, Line2D, Point2D, Rectangle2D }
+import java.awt.{ BasicStroke, Color, Graphics }
 import java.lang.Thread.sleep
-import javax.swing.{JButton, JComponent, JLabel, JPanel}
+import javax.swing.{ JButton, JComponent, JFrame, JLabel, JPanel }
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext._
 import scala.concurrent.Future
-import scala.math.{Pi, cos, sin, sqrt}
-import scala.swing.{Dimension, Graphics2D}
+import scala.math.{ Pi, cos, sin, sqrt }
+import scala.swing.{ Dimension, Graphics2D }
 import scala.util.Random
 
 object ProcTextures {
@@ -54,8 +54,8 @@ object ProcTextures {
 
   def main(args:Array[String]):Unit ={
     //------------------------------------------Параметры рисования-----------------------------------------------------
-    var gridColor = Color.BLACK
-    var cellColor = Color.WHITE
+    var gridColor = new Color(82,99,89)
+    var cellColor = new Color(120,96,96)
     var starsColor = Color.LIGHT_GRAY
     var outlineWidth = 3
     var cellSize = 80
@@ -65,7 +65,6 @@ object ProcTextures {
     var rotation:Double = 0
     var scaleX:Double = 1
     var scaleY:Double = 1
-    var shift:Double = 0
     var mode: TextureMode = BRICK
     var functionDistance = 150
     
@@ -210,6 +209,18 @@ object ProcTextures {
                                   ln.getY2 + shift))}}}
     }
     //--------------------------------------------Кирпичный заводик-----------------------------------------------------
+    var crackWidth = 1.1
+    var crackDistortionAlfaValue = 193
+    var crackDistortionDeltaValue = 78
+    var spotsPerBrick = 400
+    var maximumCrackBrakes = 5
+    var crackChance = 0.44
+    var brickColorDeviation = 0.3
+    var cementWidth = 10
+    var cementWidthDeviation = 4
+    var cementSpotsNumber = 274
+    
+    
     def sqr(d: Double):Double = d*d
     def ptDistance(pt1:(Double,Double),pt2:(Double,Double)) = sqrt(sqr(pt2._1 - pt1._1) + sqr(pt2._2-pt1._2))
     def rectByCenter(x:Double,y:Double,w:Double,h:Double):Rectangle2D = {
@@ -232,11 +243,20 @@ object ProcTextures {
     {case pkg.Color(r,g,b,_) =>
       val rand = new Random()
       new Color(
-      LOE(0,r-rand.nextInt(100)),
-      LOE(0,g-rand.nextInt(100)),
-      LOE(0,b-rand.nextInt(100)),
+      LOE(0,r-rand.nextInt(200)),
+      LOE(0,g-rand.nextInt(200)),
+      LOE(0,b-rand.nextInt(200)),
       100
       )}
+    def crackDistortion:Color=>Color =
+    {case pkg.Color(r,g,b,_) =>
+      val rand = new Random()
+      new Color(
+        LOE(0,r-crackDistortionDeltaValue),
+        LOE(0,g-crackDistortionDeltaValue),
+        LOE(0,b-crackDistortionDeltaValue),
+        crackDistortionAlfaValue
+        )}
     def shiftWithRandomRotation(x:Double,y:Double) = {
       val rand = new Random()
       val xT = pkg.shift(x,y)
@@ -288,21 +308,13 @@ object ProcTextures {
       }
       spots
     }
-    def crack(x: Double,
-              y: Double,
-              w: Double,
-              h: Double,
+    def crack(bounds:Rectangle2D,
               parts:Int,
               line:Line2D
              ):Seq[Line2D] = {
-      val bounds = new Rectangle2D.Double(x,y,w,h)
       val rand = new Random()
       @tailrec
-      def crackStep(
-                     x: Double,
-                     y: Double,
-                     w: Double,
-                     h: Double,
+      def crackStep( bounds:Rectangle2D,
                      line: Line2D
                    ):Seq[Line2D] = {
         val fi = Pi * (rand.nextDouble() - 1.0 / 2)
@@ -312,19 +324,23 @@ object ProcTextures {
         if (bounds.contains(ln.getBounds2D))
           Seq(ln, new Line2D.Double(ln.getP2, line.getP2))
         else
-          crackStep(x, y, w, h, line)
+          crackStep(bounds, line)
       }
       parts match {
         case x:Int if(x<0) => throw new IllegalArgumentException("parts number must be positive")
         case 0 => Seq()
         case 1 => Seq(line)
-        case 2 => crackStep(x,y,w,h,line)
+        case 2 => crackStep(bounds, line)
         case x:Int =>
-          crackStep(x,y,w,h,line) match {
+          crackStep(bounds,line) match {
             case Seq(ln1,ln2) =>
-              crack(x,y,w,h,x/2,ln1).appendedAll(crack(x,y,w,h,x-x/2,ln2))
+              crack(bounds,x/2,ln1).appendedAll(crack(bounds,x-x/2,ln2))
           }
       }
+    }
+    def randomDouble(x:Double,y:Double):Double = {
+      val r = new Random()
+      x + r.nextDouble()*(y-x)
     }
     def drawCement(
                     x:Double,
@@ -346,12 +362,14 @@ object ProcTextures {
       g2d.draw(place)
       g2d.fill(place)
       //добавим пузырьков
-      val bubbles = spots(x,y,w,h,1000,(1,2))
-      g2d.setColor(bubblesColorRule(Color))
-      bubbles.foreach(g2d.fill)
+      val bubbles = spots(x,y,w,h,cementSpotsNumber,(1,2))
+      bubbles.foreach({
+        g2d.setColor(bubblesColorRule(Color))
+        g2d.fill
+      })
       //"скруглим" цемент
       g2d.setColor(new Color(0,0,0,3))
-      val d = 0.01
+      val d = 0.05
       
       var i:Double = 0
       while (i < Pi/2) {
@@ -402,15 +420,35 @@ object ProcTextures {
       g2d.draw(brick)
       g2d.fill(brick)
       //рисуем вкрапления
-      val distortions = spots(brick.getX,brick.getY,brick.getWidth,brick.getHeight,300,(2,4))
+      val distortions = spots(brick.getX,brick.getY,brick.getWidth,brick.getHeight,spotsPerBrick,(2,4))
       distortions.foreach{d=>
         g2d.setColor(irregularityColorRule(finalBrickColor))
         g2d.fill(d)
       }
       //C некоторым шансом, рисуем трещину
-      g2d.setColor(crackColorRule(brickColor))
       if(rand.nextDouble()<crackChance){
-
+        val d = 0.0001
+        val (xx,yy,ww,hh) = (brick.getX+d,brick.getY+d,brick.getWidth-2*d,brick.getHeight-2*d)
+        //случайные точки на сторонах прямоугольника
+        def rTop = new Point2D.Double(randomDouble(xx,xx+ww),yy)
+        def rBot = new Point2D.Double(randomDouble(xx,xx+ww),yy+hh)
+        def rLeft = new Point2D.Double(xx,randomDouble(yy,yy+hh))
+        def rRight = new Point2D.Double(xx+ww,randomDouble(yy,yy+hh))
+        //выбираем 2 случайные точки
+        val rPoints = Seq(rTop,rBot,rLeft,rRight)
+        val points = {
+          var (x1,x2) = (rand.nextInt(4),rand.nextInt(4))
+          while(x1 == x2) {
+            x1 = rand.nextInt(4)
+          }
+          (x1,x2)
+        }
+        val crackLine = new Line2D.Double(rPoints(points._1),rPoints(points._2))
+        g2d.setColor(crackColorRule(brickColor))
+        g2d.setStroke(new BasicStroke((crackWidth).toFloat))
+        
+        crack(brick, rand.nextInt(maximumCrackBrakes+1), crackLine).foreach(g2d.draw)
+        
       }
     }
     
@@ -469,7 +507,7 @@ object ProcTextures {
           val ys = series[Int](0)(_ + brickHeight).takeWhile(_ < textureDrawer.getHeight)
           var rect:Rectangle2D = new Rectangle2D.Double(0,0,0,0)
           g2d.setColor(cellColor)
-          for {i <- xs.indices; j <- ys.indices} {
+          for {j <- ys.indices;i <- xs.indices} {
             rect = if(j % 2 == 0) rectangle(xs(i), ys(j))
                    else rectangle(xs(i) - cellSize * brickShift / 100, ys(j))
             drawBrick(
@@ -481,11 +519,11 @@ object ProcTextures {
               cellColor,
               gridColor,
               darkerDistortion,
-              darkerDistortion,
-              0,
-              0.1,
-              10,
-              4
+              crackDistortion,
+              crackChance,
+              brickColorDeviation,
+              cementWidth,
+              cementWidthDeviation
             )
           }
           
@@ -558,12 +596,12 @@ object ProcTextures {
             g2d,
             cellColor,
             gridColor,
-            zeroDistortion,
             darkerDistortion,
-            0,
-            0.1,
-            100,
-            4
+            crackDistortion,
+            crackChance,
+            brickColorDeviation,
+            cementWidth,
+            cementWidthDeviation
             )
         }
       }
@@ -576,8 +614,8 @@ object ProcTextures {
     jPanel.add(new JLabel("Texture mode"))
 
     //----------------------------------------------------Кнопки--------------------------------------------------------
-    val brickButton = new JButton("Bricks")
-    brickButton.addActionListener(_ => {
+    val bricksButton = new JButton("Bricks")
+    bricksButton.addActionListener(_ => {
       mode = BRICKS
       drawTextures()
     })
@@ -626,12 +664,20 @@ object ProcTextures {
       mode = DRAWING_PULSE
       drawTextures()
     })
+    val brickButton = new JButton("Brick")
+    brickButton.addActionListener(_=>{
+      mode = BRICK
+      drawTextures()
+    })
+    val brickSettingsButton = new JButton("Brick settings"){
+      setForeground(Color.RED)
+    }
 
 
     val buttonsPanel = new JPanel() {
       setPreferredSize(new Dimension(600,70))
       //setMinimumSize(new Dimension())
-      add(brickButton)
+      add(bricksButton)
       add(plainColorButton)
       //add(gridButton)
       //add(multicolorGridButton)
@@ -641,14 +687,16 @@ object ProcTextures {
       add(gradientWavesButton)
       add(fillingPulseButton)
       add(drawingPulseButton)
+      add(brickButton)
+      add(brickSettingsButton)
     }
 
     jPanel.add(buttonsPanel)
     //-----------------------------------------------------Слайдеры-----------------------------------------------------
     val gridColorSliders = Seq(
-      new SliderInit(0, 255, 0, "Red", { value => gridColor = new Color(value, gridColor.getGreen, gridColor.getBlue); textureDrawer.repaint() }, true),
-      new SliderInit(0, 255, 0, "Green", { value => gridColor = new Color(gridColor.getRed, value, gridColor.getBlue); textureDrawer.repaint() }, true),
-      new SliderInit(0, 255, 0, "Blue", { value => gridColor = new Color(gridColor.getRed, gridColor.getGreen, value); textureDrawer.repaint() }, true)
+      new SliderInit(0, 255, gridColor.getRed, "Red", { value => gridColor = new Color(value, gridColor.getGreen, gridColor.getBlue); textureDrawer.repaint() }, true),
+      new SliderInit(0, 255, gridColor.getGreen, "Green", { value => gridColor = new Color(gridColor.getRed, value, gridColor.getBlue); textureDrawer.repaint() }, true),
+      new SliderInit(0, 255, gridColor.getBlue, "Blue", { value => gridColor = new Color(gridColor.getRed, gridColor.getGreen, value); textureDrawer.repaint() }, true)
     )
     val cellColorSliders = Seq(
       new SliderInit(0, 255, cellColor.getRed, "Red", { value => cellColor = new Color(value, cellColor.getGreen, cellColor.getBlue); textureDrawer.repaint() }, true),
@@ -680,9 +728,46 @@ object ProcTextures {
       new SliderInit(1,50,colorDiff,"Color change speed",{value=> colorDiff = value}),
       new SliderInit(1,50,pulseDiff,"Pulse step",{value=> pulseDiff = value}),
     )
-
-    jPanel.add(slidersPanel(gridColorSliders, "Second color"))
-    jPanel.add(slidersPanel(cellColorSliders, "First color"))
+    
+    val secondColorSliders = slidersPanel(gridColorSliders, "Second color")
+    val firstColorSliders = slidersPanel(cellColorSliders, "First color")
+  
+    brickSettingsButton.addActionListener(_=>{
+      val settingsFrame = new JFrame()
+      settingsFrame.setBounds(jPanel.getBounds)
+      settingsFrame.setTitle("Brick settings")
+      settingsFrame.setVisible(true)
+      settingsFrame.setDefaultCloseOperation(1)
+      val panel: JPanel = new JPanel(){
+        val settingsSliders = Seq(
+          new SliderInit(0,100,(crackWidth*10).intValue(),"Crack width",x=>{crackWidth = x.toDouble/10}),
+          new SliderInit(0,255,crackDistortionAlfaValue,"Crack alfa",x=>{crackDistortionAlfaValue = x}),
+          new SliderInit(0,255,crackDistortionDeltaValue,"Crack color delta",x=>{crackDistortionDeltaValue = x}),
+          new SliderInit(0,1000,spotsPerBrick,"Spots per brick",x=>{spotsPerBrick = x}),
+          new SliderInit(1,7,maximumCrackBrakes,"Maximum crack brakes",x=>{maximumCrackBrakes = x}),
+          new SliderInit(0,100,(crackChance*100).intValue(),"Crack chance",x=>{crackChance = x.toDouble/100}),
+          new SliderInit(0,100,(brickColorDeviation*100).intValue(),"Brick color deviation",x=>{brickColorDeviation = x.toDouble/100}),
+          new SliderInit(5,20,cementWidth,"Cement width",x=>{cementWidth = x}),
+          new SliderInit(0,5,cementWidthDeviation,"Cement width deviation",x=>{cementWidthDeviation = x}),
+          new SliderInit(0,999,cementSpotsNumber,"Cement spots number",x=>{cementSpotsNumber = x}),
+          )
+        val repaintButton = new JButton("Repaint")
+        repaintButton.addActionListener(_=>{
+          drawTextures()
+        })
+        add(firstColorSliders)
+        add(secondColorSliders)
+        add(slidersPanel(settingsSliders,"Brick settings"))
+        add(repaintButton)
+        
+      }
+      settingsFrame.add(panel)
+    })
+    
+    
+    
+    jPanel.add(firstColorSliders)
+    jPanel.add(secondColorSliders)
     jPanel.add(slidersPanel(cellSettingsSliders, "Cell settings"))
     jPanel.add(slidersPanel(starsColorSliders,"Stars settings"))
     jPanel.add(slidersPanel(functionPrintingSliders,"Functions printing settings"))
