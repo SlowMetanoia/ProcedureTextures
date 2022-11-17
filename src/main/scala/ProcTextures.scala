@@ -219,7 +219,8 @@ object ProcTextures {
     var cementWidth = 10
     var cementWidthDeviation = 4
     var cementSpotsNumber = 274
-    
+
+    val random = new Random()
     
     def sqr(d: Double):Double = d*d
     def ptDistance(pt1:(Double,Double),pt2:(Double,Double)) = sqrt(sqr(pt2._1 - pt1._1) + sqr(pt2._2-pt1._2))
@@ -312,6 +313,7 @@ object ProcTextures {
               parts:Int,
               line:Line2D
              ):Seq[Line2D] = {
+      //if(!bounds.contains(line.getBounds)) return Seq(line)
       val rand = new Random()
       @tailrec
       def crackStep( bounds:Rectangle2D,
@@ -328,7 +330,7 @@ object ProcTextures {
       }
       parts match {
         case x:Int if(x<0) => throw new IllegalArgumentException("parts number must be positive")
-        case 0 => Seq()
+        case 0 => Seq(line)
         case 1 => Seq(line)
         case 2 => crackStep(bounds, line)
         case x:Int =>
@@ -339,8 +341,7 @@ object ProcTextures {
       }
     }
     def randomDouble(x:Double,y:Double):Double = {
-      val r = new Random()
-      x + r.nextDouble()*(y-x)
+      x + random.nextDouble()*(y-x)
     }
     def drawCement(
                     x:Double,
@@ -373,11 +374,10 @@ object ProcTextures {
       
       var i:Double = 0
       while (i < Pi/2) {
-        if(orientation) g2d.fill(new Rectangle2D.Double(x,y,w*cos(i),h))//g2d.draw(rectByCenter(x + w / 2, y + h / 2, w*cos(i), h))
-        else g2d.fill(new Rectangle2D.Double(x,y,w,h*cos(i)))//g2d.draw(rectByCenter(x + w / 2, y + h / 2, w, h*cos(i)))
+        if(orientation) g2d.fill(new Rectangle2D.Double(x,y,w*cos(i),h))
+        else g2d.fill(new Rectangle2D.Double(x,y,w,h*cos(i)))
         i+=d
       }
-      
     }
     def drawBrick(
                    x:Double,
@@ -430,12 +430,12 @@ object ProcTextures {
         val d = 0.0001
         val (xx,yy,ww,hh) = (brick.getX+d,brick.getY+d,brick.getWidth-2*d,brick.getHeight-2*d)
         //случайные точки на сторонах прямоугольника
-        def rTop = new Point2D.Double(randomDouble(xx,xx+ww),yy)
-        def rBot = new Point2D.Double(randomDouble(xx,xx+ww),yy+hh)
-        def rLeft = new Point2D.Double(xx,randomDouble(yy,yy+hh))
-        def rRight = new Point2D.Double(xx+ww,randomDouble(yy,yy+hh))
+        def rTop():Point2D = new Point2D.Double(randomDouble(xx,xx+ww),yy)
+        def rBot():Point2D = new Point2D.Double(randomDouble(xx,xx+ww),yy+hh)
+        def rLeft():Point2D = new Point2D.Double(xx,randomDouble(yy,yy+hh))
+        def rRight():Point2D = new Point2D.Double(xx+ww,randomDouble(yy,yy+hh))
         //выбираем 2 случайные точки
-        val rPoints = Seq(rTop,rBot,rLeft,rRight)
+        val rPoints = Seq(rTop(),rBot(),rLeft(),rRight())
         val points = {
           var (x1,x2) = (rand.nextInt(4),rand.nextInt(4))
           while(x1 == x2) {
@@ -447,13 +447,8 @@ object ProcTextures {
         g2d.setColor(crackColorRule(brickColor))
         g2d.setStroke(new BasicStroke((crackWidth).toFloat))
         
-        val crackLines = crack(brick, rand.nextInt(maximumCrackBrakes+1), crackLine).flatMap{ crackLine=>
-          val randomPoint = rPoints.take(points._2).appendedAll(rPoints.takeRight(rPoints.length - points._2))(rand.nextInt(3))
-          crack(brick,
-                rand.nextInt(maximumCrackBrakes+1),
-                new Line2D.Double(crackLine.getP2,randomPoint)).appended(crackLine)
-        }
-        if(crackLines.forall(cl=>brick.contains(cl.getBounds))) crackLines.foreach(g2d.draw)
+        val crackLines = crack(brick, 30/*rand.nextInt(maximumCrackBrakes+1)*/, crackLine)
+          crackLines.foreach(g2d.draw)
       }
     }
     
@@ -744,7 +739,7 @@ object ProcTextures {
       settingsFrame.setVisible(true)
       settingsFrame.setDefaultCloseOperation(1)
       val panel: JPanel = new JPanel(){
-        val settingsSliders = Seq(
+        val settingsSliders: Seq[SliderInit] = Seq(
           new SliderInit(0,100,(crackWidth*10).intValue(),"Crack width",x=>{crackWidth = x.toDouble/10}),
           new SliderInit(0,255,crackDistortionAlfaValue,"Crack alfa",x=>{crackDistortionAlfaValue = x}),
           new SliderInit(0,255,crackDistortionDeltaValue,"Crack color delta",x=>{crackDistortionDeltaValue = x}),
@@ -767,6 +762,7 @@ object ProcTextures {
         
       }
       settingsFrame.add(panel)
+      jFrame.revalidate()
     })
     
     
