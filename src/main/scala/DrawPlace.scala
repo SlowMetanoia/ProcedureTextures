@@ -112,4 +112,10 @@ object DrawPlace{
   sealed trait shapesProducer extends JPanel{
     def getShapes:Seq[Line2D]
   }
+
+  def main(args: Array[String]): Unit = {
+    val jFrame = JFrameBasics.jFrame
+    jFrame.add(new DrawPlace(null))
+    jFrame.revalidate()
+  }
 }

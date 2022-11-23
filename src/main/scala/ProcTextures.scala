@@ -84,7 +84,11 @@ object ProcTextures {
     var pulseDiff = 1
     var colorDiff = 5
     val pulsingValues = {
-      val initial = new Ellipse2D.Double(350, 350, 1, 1)
+      val rand:Random = new Random()
+      def initial = {
+        val r = rand.nextDouble()*pulseDiff
+        new Ellipse2D.Double(350-r/2, 350-r/2, r, r)
+      }
       def initialColor = cellColor
       val initColorItr: Iterator[Color ] = new Iterator[Color]{
         var alfa = 255
@@ -209,16 +213,17 @@ object ProcTextures {
                                   ln.getY2 + shift))}}}
     }
     //--------------------------------------------Кирпичный заводик-----------------------------------------------------
-    var crackWidth = 1.1
-    var crackDistortionAlfaValue = 193
+    var crackWidth = 1.6
+    var crackDistortionAlfaValue = 116
     var crackDistortionDeltaValue = 78
     var spotsPerBrick = 400
-    var maximumCrackBrakes = 5
+    var maximumCrackFractures = 40
     var crackChance = 0.44
     var brickColorDeviation = 0.3
     var cementWidth = 10
     var cementWidthDeviation = 4
     var cementSpotsNumber = 274
+    var crackMaxAng = Pi/4
 
     val random = new Random()
     
@@ -242,16 +247,15 @@ object ProcTextures {
     def incLim = inLim(_,0,255)
     def darkerDistortion:Color=>Color =
     {case pkg.Color(r,g,b,_) =>
-      val rand = new Random()
       new Color(
-      LOE(0,r-rand.nextInt(200)),
-      LOE(0,g-rand.nextInt(200)),
-      LOE(0,b-rand.nextInt(200)),
+      LOE(0,r-random.nextInt(200)),
+      LOE(0,g-random.nextInt(200)),
+      LOE(0,b-random.nextInt(200)),
       100
       )}
     def crackDistortion:Color=>Color =
     {case pkg.Color(r,g,b,_) =>
-      val rand = new Random()
+      val rand = random
       new Color(
         LOE(0,r-crackDistortionDeltaValue),
         LOE(0,g-crackDistortionDeltaValue),
@@ -259,14 +263,14 @@ object ProcTextures {
         crackDistortionAlfaValue
         )}
     def shiftWithRandomRotation(x:Double,y:Double) = {
-      val rand = new Random()
+      val rand = random
       val xT = pkg.shift(x,y)
       xT.concatenate(pkg.rotation(rand.nextDouble() * Pi / 4))
       xT
     }
     def zeroDistortion:Color=>Color = {
       case pkg.Color(r,g,b,_)=>
-        val rand = new Random()
+        val rand = random
         new Color(
           incLim(r+rand.nextInt(100)-50),
           incLim(r+rand.nextInt(100)-50),
@@ -290,7 +294,7 @@ object ProcTextures {
                trys:Int,
                rLimits:(Int,Int)
              ):Seq[Ellipse2D] = {
-      val rand = new Random()
+      val rand = random
       val canvas = new Rectangle2D.Double(x,y,w,h)
       
       var spots = Seq.empty[Ellipse2D]
@@ -319,7 +323,7 @@ object ProcTextures {
       def crackStep( bounds:Rectangle2D,
                      line: Line2D
                    ):Seq[Line2D] = {
-        val fi = Pi * (rand.nextDouble() - 1.0 / 2)
+        val fi = crackMaxAng * 2 * (rand.nextDouble() - 1.0 / 2)
         val xT = pkg.shift(line.getX1, line.getY1)
         xT.concatenate(pkg.rotation(fi))
         val ln = ATChooseComponent.applyTransform(lineVectorHalf(line), xT)
@@ -355,8 +359,6 @@ object ProcTextures {
                     orientation:Boolean,
                     bubblesColorRule:Color=>Color,
                   ):Unit = {
-      val r = new Random()
-      
       //Закрасим всё.
       val place = new Rectangle2D.Double(x,y,w,h)
       g2d.setColor(Color)
@@ -394,7 +396,7 @@ object ProcTextures {
                    cementWidth:Double,
                    cementWidthDeviation:Double
                  ):Unit = {
-      val rand = new Random()
+      val rand = random
       //рисуем цемент
       //правый слой
       val wd = cementWidth + rand.nextDouble() * 2 * cementWidthDeviation - cementWidthDeviation
@@ -447,14 +449,12 @@ object ProcTextures {
         g2d.setColor(crackColorRule(brickColor))
         g2d.setStroke(new BasicStroke((crackWidth).toFloat))
         
-        val crackLines = crack(brick, 30/*rand.nextInt(maximumCrackBrakes+1)*/, crackLine)
+        val crackLines = crack(brick, maximumCrackFractures, crackLine)
           crackLines.foreach(g2d.draw)
       }
     }
     
     //--------------------------------------Раздутая функция отрисовки--------------------------------------------------
-
-
     def drawTextures(): Unit = {
       val square: (Double, Double) => Rectangle2D = new Rectangle2D.Double(_, _, cellSize, cellSize)
       mode match {
@@ -724,7 +724,7 @@ object ProcTextures {
     )
     
     val pulseSliders = Seq(
-      new SliderInit(0,300,tickTime,"Tick time",{value=> tickTime = value}),
+      new SliderInit(0,999,tickTime,"Tick time",{value=> tickTime = value}),
       new SliderInit(1,50,colorDiff,"Color change speed",{value=> colorDiff = value}),
       new SliderInit(1,50,pulseDiff,"Pulse step",{value=> pulseDiff = value}),
     )
@@ -743,8 +743,8 @@ object ProcTextures {
           new SliderInit(0,100,(crackWidth*10).intValue(),"Crack width",x=>{crackWidth = x.toDouble/10}),
           new SliderInit(0,255,crackDistortionAlfaValue,"Crack alfa",x=>{crackDistortionAlfaValue = x}),
           new SliderInit(0,255,crackDistortionDeltaValue,"Crack color delta",x=>{crackDistortionDeltaValue = x}),
-          new SliderInit(0,1000,spotsPerBrick,"Spots per brick",x=>{spotsPerBrick = x}),
-          new SliderInit(1,7,maximumCrackBrakes,"Maximum crack brakes",x=>{maximumCrackBrakes = x}),
+          new SliderInit(0,999,spotsPerBrick,"Spots per brick",x=>{spotsPerBrick = x}),
+          new SliderInit(1,100,maximumCrackFractures,"Maximum crack fractures", x=>{maximumCrackFractures = x}),
           new SliderInit(0,100,(crackChance*100).intValue(),"Crack chance",x=>{crackChance = x.toDouble/100}),
           new SliderInit(0,100,(brickColorDeviation*100).intValue(),"Brick color deviation",x=>{brickColorDeviation = x.toDouble/100}),
           new SliderInit(5,20,cementWidth,"Cement width",x=>{cementWidth = x}),
