@@ -29,8 +29,6 @@ object ProcTextures {
   final object GRADIENT_WAVES extends TextureMode
   final object FILLING_PULSE extends TextureMode
   final object DRAWING_PULSE extends TextureMode
- 
-
 
   //-------------------------------------------Рисовальщик текстур----------------------------------------------------
   object textureDrawer extends JComponent {
