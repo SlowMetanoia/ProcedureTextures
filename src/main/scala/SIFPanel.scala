@@ -1,9 +1,10 @@
 
+import SIFPanel.{applyTransformations, transformationsList}
 import pkg._
 
 import java.awt.Shape
-import java.awt.geom.{ AffineTransform, Line2D }
-import javax.swing.{ JButton, JPanel }
+import java.awt.geom.{AffineTransform, Line2D}
+import javax.swing.{JButton, JPanel}
 import scala.swing.Dimension
 
 class SIFPanel extends JPanel{
@@ -13,27 +14,7 @@ class SIFPanel extends JPanel{
   //число итераций
   var iterationsNumber:Int = 5
   
-  def transformationsList(affineTransforms:Seq[AffineTransform]):LazyList[Seq[AffineTransform]] = {
-    series[Seq[AffineTransform]](Seq(new AffineTransform())) { transforms =>
-      transforms.flatMap { t0 =>
-        affineTransforms.map { t1 =>
-          val result = new AffineTransform(t0)
-          result.concatenate(t1)
-          result
-        }
-      }
-    }
-  }
-  def applyTransformations(transformations:Seq[AffineTransform],shapes:Seq[Line2D]):Seq[Shape] = {
-    shapes.flatMap{ shape=>
-      transformations.map{transformation=>
-        new Line2D.Double(
-          transformation.transform(shape.getP1,null),
-          transformation.transform(shape.getP2,null)
-        )
-      }
-    }
-  }
+
   
   val itSlider: JPanel =
     new SliderInit(0,100,iterationsNumber,"Iterations number", x => {iterationsNumber = x}).getSliderPanel
@@ -60,6 +41,28 @@ class SIFPanel extends JPanel{
   revalidate()
 }
 object SIFPanel{
+  def transformationsList(affineTransforms: Seq[AffineTransform]): LazyList[Seq[AffineTransform]] = {
+    series[Seq[AffineTransform]](Seq(new AffineTransform())) { transforms =>
+      transforms.flatMap { t0 =>
+        affineTransforms.map { t1 =>
+          val result = new AffineTransform(t0)
+          result.concatenate(t1)
+          result
+        }
+      }
+    }
+  }
+
+  def applyTransformations(transformations: Seq[AffineTransform], shapes: Seq[Line2D]): Seq[Shape] = {
+    shapes.flatMap { shape =>
+      transformations.map { transformation =>
+        new Line2D.Double(
+          transformation.transform(shape.getP1, null),
+          transformation.transform(shape.getP2, null)
+        )
+      }
+    }
+  }
   def main( args: Array[ String ] ): Unit = {
     val jFrame = JFrameBasics.jFrame
     jFrame.setTitle("System of iterating functions")

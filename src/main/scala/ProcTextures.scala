@@ -66,7 +66,6 @@ object ProcTextures {
     var mode: TextureMode = BRICK
     var functionDistance = 150
     
-    
     //-----------------------------------------------Дополнительные фишки для пульсации---------------------------------
   
     var tickTime = 10

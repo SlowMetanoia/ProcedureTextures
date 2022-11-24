@@ -25,6 +25,7 @@ class PaintFrame(
     override def paintComponent( g: Graphics ): Unit = {
       super.paintComponent(g)
       val g2d = g.asInstanceOf[Graphics2D]
+      g2d.setColor(backgroundColor)
       g2d.fillRect(-3000,-3000,6000,6000)
       g2d.setTransform(transform)
       g2d.setColor(linesColor)
