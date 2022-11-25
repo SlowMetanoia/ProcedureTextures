@@ -1,5 +1,6 @@
 import SIFPanel.{applyTransformations, transformationsList}
 import breeze.linalg.{DenseMatrix, Matrix, inv}
+import pkg.SliderInit
 
 import java.awt.Color
 import java.awt.geom.{AffineTransform, Line2D, Point2D}
@@ -7,7 +8,7 @@ import javax.swing.{JButton, JPanel}
 import scala.swing.Dimension
 
 class SIF2P extends JPanel{
-  val iterations = 5
+  var iterations = 5
   val drawer = new TriangleDrawer
   setLayout(null)
   drawer.setBounds(0,0,700,700)
@@ -16,6 +17,7 @@ class SIF2P extends JPanel{
 
   object SettingsPanel extends JPanel {
     setBounds(700, 0, 600, 700)
+    val c = 5
 
     val paintButton = new JButton("paint!")
     paintButton.addActionListener(_ => {
@@ -45,7 +47,15 @@ class SIF2P extends JPanel{
         .map(triangle2Matrix) match {case Seq(h, rest @ _*)=> (h,rest)}
       val xTs = images.map{img=>
         val mx = source \ img
-        val xT = new AffineTransform(mx(0,0),mx(0,1),mx(1,0),mx(1,1),mx(0,2),mx(1,2))
+        println(mx)
+        /*println(s"mx(0,0) = ${mx(0,0)}")
+        println(s"mx(1,0) = ${mx(1,0)}")
+        println(s"mx(0,1) = ${mx(0, 1)}")
+        println(s"mx(1,1) = ${mx(1, 1)}")
+        println(s"mx(0,2) = ${mx(0,2)}")
+        println(s"mx(1,2) = ${mx(1,2)}")*/
+        val xT = new AffineTransform(mx(0,0),mx(0,1),mx(1,0),mx(1,1),mx(2,0),mx(2,1))
+        println(s"xT = ${xT}")
         xT
       }
       def tLines(pSeq:Seq[Point2D]):Seq[Line2D] = pSeq match {
@@ -56,12 +66,23 @@ class SIF2P extends JPanel{
             new Line2D.Double(c,a)
           )
       }
-      val transforms = transformationsList(xTs)
-      val shapes = applyTransformations(transforms(iterations),tLines(triangles.head))
-      val visualize = new PaintFrame(shapes = shapes,transformCalc = _=>new AffineTransform(2,0,0,2,0,0))
+      val transforms = transformationsList(xTs)(iterations)
+      val shapes = {
+        val base = triangles.head
+        transforms.map{xT=>
+          base match {
+            case Seq(a,b,c) =>
+              Seq(
+                xT.transform(a,null),
+                xT.transform(b,null),
+                xT.transform(c,null),
+              )}}}
+      //applyTransformations(transforms(iterations),tLines(triangles.head))
+      val visualize = new FramePainting(Color.BLACK,Color.YELLOW,shapes.flatMap(tLines))
     })
     add(paintButton)
-
+    val itSlider = new SliderInit(0,20,iterations,"Iterations number",value=>{iterations = value}).getSliderPanel
+    add(itSlider)
     //setBackground(Color.BLACK)
     revalidate()
   }
