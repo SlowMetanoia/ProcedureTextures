@@ -1,3 +1,4 @@
+import breeze.numerics.sqrt
 import pkg.getConstraints
 
 import java.awt.event.{MouseAdapter, MouseEvent, MouseMotionAdapter}
@@ -16,7 +17,7 @@ class TriangleDrawer extends JPanel {
 
   setMinimumSize(new Dimension(400, 400))
   setMaximumSize(new Dimension(800, 800))
-  setPreferredSize(new Dimension(500, 500))
+  setPreferredSize(new Dimension(700, 700))
 
   val gridBagLayout = new GridBagLayout
   setLayout(gridBagLayout)
@@ -24,24 +25,17 @@ class TriangleDrawer extends JPanel {
   val clearC: GridBagConstraints = getConstraints(18, 0, 1, 17)
   val drawC: GridBagConstraints = getConstraints(0, 1, 34, 35)
 
-  val bindingButton = new JButton("Switch grid binding mode")
-  val clearButton = new JButton("Clear")
-  var isBinding = true
 
-  bindingButton.addActionListener(_ => {
-    isBinding = !isBinding;
-    drawablePart.repaint()
-  })
-  clearButton.addActionListener(_ => {
+  val clearButton = new JButton("Clear")
+  clearButton.addActionListener(_=>{
     drawablePart.points = Seq.empty
     drawablePart.repaint()
-  }
-  )
-
+  })
+  
   object drawablePart extends JComponent {
     setMinimumSize(new Dimension(400, 400))
     setMaximumSize(new Dimension(700, 700))
-    setPreferredSize(new Dimension(500, 500))
+    setPreferredSize(new Dimension(600, 600))
 
     var mousePoint: Point2D = new Point2D.Double(0, 0)
 
@@ -50,7 +44,7 @@ class TriangleDrawer extends JPanel {
     addMouseListener(new MouseAdapter {
       override def mouseClicked(e: MouseEvent): Unit = {
         super.mouseClicked(e)
-        points = points.appended(e.getPoint)
+        points = points.appended(mousePoint)
         repaint()
       }
     })
@@ -59,9 +53,13 @@ class TriangleDrawer extends JPanel {
       override def mouseMoved(e: MouseEvent): Unit = {
         super.mouseMoved(e)
         val point = e.getPoint
-        mousePoint = if (isBinding) {
-          new Point2D.Double(point.getX.round, point.getY.round)
-        } else point
+        mousePoint = {
+          val matchingPoint = points.find(pt => sqrt(
+            (point.getX - pt.getX) * (point.getX - pt.getX) + (point.getY - pt.getY) * (point.getY - pt.getY)
+          ) < 5)
+          if(matchingPoint.isEmpty) point
+          else matchingPoint.get
+        }
         repaint()
       }})
     def getTriangles:Seq[Seq[Point2D]] =
@@ -109,7 +107,6 @@ class TriangleDrawer extends JPanel {
     }
   }
 
-  add(bindingButton, bindingC)
   add(clearButton, clearC)
   add(drawablePart, drawC)
   revalidate()
