@@ -1,4 +1,4 @@
-import java.awt.geom.{ AffineTransform, Line2D }
+import java.awt.geom.{ AffineTransform, Line2D, Point2D }
 import java.awt.{ Color, Dimension, GridBagConstraints, GridBagLayout, Insets, Label }
 import javax.swing.{ JLabel, JPanel, JSlider, JTextField }
 import scala.math.{ cos, sin, sqrt }
@@ -84,6 +84,23 @@ object pkg {
     add(textField, tc)
     textField.addPropertyChangeListener(_=>{ tfValue.foreach(se)})
     def tfValue:Option[Double] = textField.getText.toDoubleOption
+  }
+  
+  def paramFunc2Lines(t1:Double,t2:Double,fx:Double=>Double,fy:Double=>Double,parts:Either[Int,Double]):Seq[Line2D] = {
+    val points = parts match {
+      case Left(n)=> series[Double](t1)((t2-t1)/n + _).takeWhile(_<=t2).map(t=>new Point2D.Double(fx(t),fy(t)))
+      case Right(d)=> series[Double](t1)(d + _).takeWhile(_<t2).appended(t2).map(t=>new Point2D.Double(fx(t),fy(t)))
+    }
+    points
+      .sliding(2)
+      .map{ case Seq(p1,p2) => new Line2D.Double(p1,p2) }
+      .toSeq
+  }
+  def polynomial(as:Double*):Double=>Double = {
+    as
+      .zipWithIndex
+      .map { case (a, i) => ( x: Double ) => a * math.pow(x, i) }
+      .reduce((f1,f2)=>(x:Double)=>f1(x) + f2(x))
   }
   
   class SliderInit( min:Int, max:Int, defVal:Int, label:String, se:Int=>Unit, isValueDisplaying:Boolean = true){
