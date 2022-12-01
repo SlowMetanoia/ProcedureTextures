@@ -13,6 +13,7 @@ class TriangleDrawer extends JPanel {
   val sourceColor = new Color(0,255,0)
   val nonExistingColor = new Color(255,0,255)
   val color = new Color(255,255,255)
+  val minDist = 10
 
 
   setMinimumSize(new Dimension(400, 400))
@@ -25,30 +26,74 @@ class TriangleDrawer extends JPanel {
   val clearC: GridBagConstraints = getConstraints(18, 0, 1, 17)
   val drawC: GridBagConstraints = getConstraints(0, 1, 34, 35)
 
+  var changeListeners:Seq[Seq[Seq[Point2D]]=>Unit] = Seq.empty
+
+  def addChangeListener(cl:Seq[Seq[Point2D]]=>Unit):Unit = changeListeners = changeListeners.appended(cl)
+  def applyChanges(): Unit = changeListeners.foreach{ cl=>
+    cl(drawablePart.getTriangles)
+  }
 
   val clearButton = new JButton("Clear")
   clearButton.addActionListener(_=>{
     drawablePart.points = Seq.empty
     drawablePart.repaint()
   })
-  
+
   object drawablePart extends JComponent {
     setMinimumSize(new Dimension(400, 400))
     setMaximumSize(new Dimension(700, 700))
     setPreferredSize(new Dimension(600, 600))
 
     var mousePoint: Point2D = new Point2D.Double(0, 0)
-
     var points = Seq.empty[Point2D]
+    var draggingPoint:Option[(Point2D,Int)] = None
+
+    def dragPoint(e: MouseEvent): Unit = {
+      draggingPoint
+        .foreach { case (_, i) => points = points.updated(i, e.getPoint) }
+      //draggingPoint = None
+      applyChanges()
+      repaint()
+    }
 
     addMouseListener(new MouseAdapter {
-      override def mouseClicked(e: MouseEvent): Unit = {
-        super.mouseClicked(e)
-        points = points.appended(mousePoint)
+      override def mousePressed(e: MouseEvent): Unit = {
+        super.mousePressed(e)
+        e.getButton match {
+          //ЛКМ
+          case 1 =>
+            points = points.appended(mousePoint)
+            applyChanges()
+          //ПКМ
+          case 3 =>
+          if(draggingPoint.isEmpty){
+            val closest = points
+              .zipWithIndex
+              .find(pt => distance(pt._1, e.getPoint) < minDist)
+            closest.foreach(pt => draggingPoint = Some(pt))
+          }else{
+            dragPoint(e)
+            draggingPoint = None
+          }
+        }
         repaint()
       }
+
+      /*override def mouseReleased(e: MouseEvent): Unit = {
+        super.mouseReleased(e)
+        e.getButton match {
+          case 1=>
+          case 3=>
+            dragPoint(e)
+        }
+      }*/
     })
 
+    def distance(pt1:Point2D,pt2:Point2D):Double = {
+      val dx = pt1.getX-pt2.getX
+      val dy = pt1.getY-pt2.getY
+      sqrt(dx*dx+dy*dy)
+    }
     addMouseMotionListener(new MouseMotionAdapter {
       override def mouseMoved(e: MouseEvent): Unit = {
         super.mouseMoved(e)
@@ -60,6 +105,7 @@ class TriangleDrawer extends JPanel {
           if(matchingPoint.isEmpty) point
           else matchingPoint.get
         }
+        if(draggingPoint.nonEmpty) dragPoint(e)
         repaint()
       }})
     def getTriangles:Seq[Seq[Point2D]] =

@@ -2,12 +2,12 @@ import JFrameBasics.{dimension, windowSize}
 
 import java.awt.{BasicStroke, Color, Graphics, Shape}
 import javax.swing.{JComponent, JFrame}
-import scala.swing.Graphics2D
+import scala.swing.{Dimension, Graphics2D}
 
 class FramePainting(
                       backgroundColor: Color = Color.BLACK,
                       linesColor: Color = Color.YELLOW,
-                      shapes: Seq[Shape],
+                      var shapes: Seq[Shape],
                     )extends JFrame{
   setTitle("Painting")
   setVisible(true)
@@ -18,7 +18,10 @@ class FramePainting(
     windowSize._1,
     windowSize._2
   )
-  val component: JComponent = new JComponent {
+  val drawComponent: JComponent = new JComponent {
+    setMinimumSize(new Dimension(600,600))
+    setMaximumSize(new Dimension(1000,1000))
+    setPreferredSize(new Dimension(600,600))
     override def paintComponent(g: Graphics): Unit = {
       super.paintComponent(g)
       val g2d = g.asInstanceOf[Graphics2D]
@@ -29,5 +32,5 @@ class FramePainting(
       shapes.foreach(g2d.draw)
     }
   }
-  add(component)
+  add(drawComponent)
 }
