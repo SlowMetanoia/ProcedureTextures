@@ -1,4 +1,4 @@
-import JFrameBasics.{dimension, windowSize}
+import PaintFrame._
 
 import java.awt.{BasicStroke, Color, Graphics, Shape}
 import javax.swing.{JComponent, JFrame}

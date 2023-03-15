@@ -6,17 +6,22 @@ import javax.swing.JFrame
 import scala.swing.Dimension
 
 object JFrameBasics {
-  val jFrame: JFrame = new JFrame()
- 
-  val dimension: Dimension = Toolkit.getDefaultToolkit.getScreenSize
-  
-  val relativeScreenSize: (Double, Double)= (0.5, 0.5)
-  
-
-  val windowSize: (Int, Int) = (
-    1300,
-    700
-  )
+  val jFrame: JFrame = new JFrame(){
+    val dimension: Dimension = Toolkit.getDefaultToolkit.getScreenSize
+    val relativeScreenSize: (Double, Double)= (0.5, 0.5)
+    val windowSize: (Int, Int) = (
+      1300,
+      700
+    )
+    setTitle("MyApp")
+    setBackground(Color.BLACK)
+    setVisible(true)
+    setDefaultCloseOperation(1)
+    setBounds(dimension.width/2 - windowSize._1/2,
+                     dimension.height/2 - windowSize._2/2,
+                     windowSize._1,
+                     windowSize._2)
+  }
   
   val windowCenter: (Int, Int) = (350, 350)
   
@@ -36,15 +41,6 @@ object JFrameBasics {
   val mainGridLinesStroke = new BasicStroke((3.0/unitRelativeSize).toFloat)
 
   val gridColor = new Color(0,200,100,100)
-
-  jFrame.setTitle("MyApp")
-  jFrame.setBackground(Color.BLACK)
-  jFrame.setVisible(true)
-  jFrame.setDefaultCloseOperation(1)
-  jFrame.setBounds(dimension.width/2 - windowSize._1/2,
-                   dimension.height/2 - windowSize._2/2,
-                   windowSize._1,
-                   windowSize._2)
   
 }
 
