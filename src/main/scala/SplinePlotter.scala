@@ -108,15 +108,9 @@ class SplinePlotter extends JPanel{
   }
   
   def cardinalSplineCurve( points:Seq[Point2D], scale:Double):Seq[Point2D] = {
+    val n = 100
     if(points.length>2) {
       var pts = points.map(p => (p.getX, p.getY))
-      pts = pts.prepended(mirrorPoint(pts(0),pts(1) ,1.0))
-      pts = pts.prepended(mirrorPoint(pts(0),pts(1) ,10.0))
-      pts = pts.prepended(mirrorPoint(pts(0),pts(1) ,2.0))
-      pts = pts.appended(mirrorPoint(pts.last, pts.init.last,1.0))
-      pts = pts.appended(mirrorPoint(pts.last, pts.init.last,10.0))
-      pts = pts.appended(mirrorPoint(pts.last, pts.init.last,2.0))
-      
       var cardinalSplineVelocities =
         pts
           .sliding(3)
@@ -124,9 +118,10 @@ class SplinePlotter extends JPanel{
       cardinalSplineVelocities = cardinalSplineVelocities
         .appended((0.0,0.0))
         .prepended((0.0,0.0))
-      val ttt = tt(100)
-      val input = pts.zip(cardinalSplineVelocities)
-      input
+      
+      val ttt = tt(n)
+      val dt = 1.0/n
+      val fPoints = pts.zip(cardinalSplineVelocities)
         .sliding(2)
         .flatMap {
           pair =>
@@ -134,6 +129,8 @@ class SplinePlotter extends JPanel{
             val points = ttt.map(t => hermitSpline(p0, p1, v0.asInstanceOf[(Double,Double)], v1.asInstanceOf[(Double,Double)], t))
             points.map(p => new Point2D.Double(p._1, p._2))
         }.toSeq
+      
+      fPoints
     }else{
       Seq.empty
     }
