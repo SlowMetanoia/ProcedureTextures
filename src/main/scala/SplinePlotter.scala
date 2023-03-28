@@ -28,7 +28,11 @@ class SplinePlotter extends JPanel{
   
   
   //отрисовываемые точки
-  var points:Seq[Point2D] = Seq.empty
+  var points:Seq[Point2D] = /*Seq.empty*/ Seq(
+    new Point2D.Double(100,100),
+    new Point2D.Double(200,400),
+    new Point2D.Double(400, 300)
+  )
   
   var movingPoint:Option[Int] = None
   
@@ -42,14 +46,17 @@ class SplinePlotter extends JPanel{
     }
     
   }
+  
   def interpolate(points:Seq[Point2D],g2d:Graphics2D):Unit = {
     g2d.setColor(inBetweenColor)
     if(points.length>2) {
+      cardinalSplineCurve(points,scale = .5).sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
+      g2d.setColor(splineColor)
       //points.sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
-      cardinalSplineCurve(points,scale = .3).sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
     }
   }
-  def cardinalSpline( p0:vec2, p1:vec2, v0:vec2, v1:vec2, scale:Double, t:Double):vec2 ={
+  
+  def hermitSpline( p0:vec2, p1:vec2, v0:vec2, v1:vec2, t:Double):vec2 ={
     val points = DenseMatrix(p0, v0, p1, v1)
     /*
     * vec4(1,0,0,0),
@@ -59,33 +66,64 @@ class SplinePlotter extends JPanel{
     * */
     val cardinalMatrix = DenseMatrix(
       (1.0,0.0,0.0,0.0),
+      (0.0,1.0,0.0,0.0),
+      (-3.0,-2.0,3.0,-1.0),
+      (2.0,1.0,-2.0,1.0)
+    )
+      /*DenseMatrix(
+      (1.0,0.0,0.0,0.0),
       (-scale,0.0, scale,0.0),
-      (2.0* scale, scale -3.0,3.0 - 2.0 * scale, -scale),
+      (2.0* scale, scale -3.0, 3.0 - 2.0 * scale, -scale),
       (-scale,2.0 - scale, scale -2.0, scale)
-      )
+      )*/
     val powers = DenseMatrix((1.0,t,t*t,t*t*t))
     
     val result =  powers * cardinalMatrix * points
     
     (result.apply(0,0),result.apply(0,1))
   }
-  def mirrorPoint(mirror:vec2,mirrored:vec2, scale:Double):vec2={
-    val v = (mirror._1 - mirrored._1,mirror._2 - mirrored._2)
+  def mirrorPoint(mirror:vec2, mirrored:vec2, scale:Double):vec2={
+    val v = (mirror._1 - mirrored._1, mirror._2 - mirrored._2)
     val l = sqrt(v._1*v._1 + v._2*v._2)
     val nv = (v._1/l, v._2/l)
-    (nv._1*scale,nv._2*scale)
+    (mirror._1 + nv._1*(l*scale),mirror._2 + nv._2*(l*scale))
+  }
+  
+  def S(p0:vec2,p1:vec2):vec2 = (p1._1-p0._1,p1._2-p0._2)
+  
+  def length(p0:vec2,p1:vec2):Double = {
+    val s = S(p0:vec2,p1:vec2)
+    sqrt(s._1*s._1+s._2*s._2)
+  }
+  
+  def direction(p0:vec2,p1:vec2):vec2 = {
+    val s = S(p0, p1)
+    val l = length(p0, p1)
+    (s._1/l,s._2/l)
+  }
+  
+  def outPoint(p0:vec2,p1:vec2):vec2 = {
+    val d = direction(p1,p0)
+    (p1._1+d._1*1200,p1._2+d._2*1200)
   }
   
   def cardinalSplineCurve( points:Seq[Point2D], scale:Double):Seq[Point2D] = {
     if(points.length>2) {
-      val pts = points.map(p => (p.getX, p.getY))
+      var pts = points.map(p => (p.getX, p.getY))
+      pts = pts.prepended(mirrorPoint(pts(0),pts(1) ,1.0))
+      pts = pts.prepended(mirrorPoint(pts(0),pts(1) ,10.0))
+      pts = pts.prepended(mirrorPoint(pts(0),pts(1) ,2.0))
+      pts = pts.appended(mirrorPoint(pts.last, pts.init.last,1.0))
+      pts = pts.appended(mirrorPoint(pts.last, pts.init.last,10.0))
+      pts = pts.appended(mirrorPoint(pts.last, pts.init.last,2.0))
+      
       var cardinalSplineVelocities =
         pts
           .sliding(3)
-          .map { case Seq(t, _, h) => (t._1 - h._1, t._2 - h._2) }.toSeq
+          .map { case Seq(h, _, t) => ((t._1 - h._1)*scale, (t._2 - h._2)*scale) }.toSeq
       cardinalSplineVelocities = cardinalSplineVelocities
-        .appended((1.0,0.0))
-        .prepended((1.0,0.0))
+        .appended((0.0,0.0))
+        .prepended((0.0,0.0))
       val ttt = tt(100)
       val input = pts.zip(cardinalSplineVelocities)
       input
@@ -93,7 +131,7 @@ class SplinePlotter extends JPanel{
         .flatMap {
           pair =>
             val ((p0,v0),(p1,v1)) = (pair.head,pair.last)
-            val points = ttt.map(t => cardinalSpline(p0, p1, v0.asInstanceOf[(Double,Double)], v1.asInstanceOf[(Double,Double)], scale, t))
+            val points = ttt.map(t => hermitSpline(p0, p1, v0.asInstanceOf[(Double,Double)], v1.asInstanceOf[(Double,Double)], t))
             points.map(p => new Point2D.Double(p._1, p._2))
         }.toSeq
     }else{
@@ -138,7 +176,6 @@ class SplinePlotter extends JPanel{
     val arrowParts:Seq[Line2D] = {
       val arrP1 = new Point2D.Double(baseP.getX - arrowWidth*normalizedY,baseP.getY + arrowWidth*normalizedX)
       val arrP2 = new Point2D.Double(baseP.getX + arrowWidth*normalizedY,baseP.getY - arrowWidth*normalizedX)
-      
       Seq(new Line2D.Double(pt2,arrP1),new Line2D.Double(pt2,arrP2))
     }
     g2d.draw(line)
