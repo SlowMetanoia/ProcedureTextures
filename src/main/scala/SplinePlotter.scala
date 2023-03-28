@@ -1,4 +1,4 @@
-import breeze.linalg.min
+import breeze.linalg.{ DenseMatrix, min }
 import breeze.numerics.sqrt
 
 import java.awt.event.{ MouseAdapter, MouseEvent }
@@ -9,13 +9,15 @@ import scala.swing.{ Dimension, Graphics2D }
 
 class SplinePlotter extends JPanel{
   
+  type vec2 = (Double,Double)
+  
   sealed trait SPLINE
   
   sealed trait SPLINE_MODE
   final object ERMIT extends SPLINE_MODE
-  final object INTERPOLATING extends SPLINE_MODE
+  final object NATURAL extends SPLINE_MODE
   
-  var mode:SPLINE_MODE = INTERPOLATING
+  var mode:SPLINE_MODE = NATURAL
   val bgColor: Color = Color.DARK_GRAY
   val pointColor: Color = Color.YELLOW
   val vectorColor: Color = Color.GREEN
@@ -32,16 +34,81 @@ class SplinePlotter extends JPanel{
   
   def interpolateErmitLike(points:Seq[Point2D],g2d:Graphics2D):Unit = {
     g2d.setColor(inBetweenColor)
-    if(points.length>3)
+    if(points.length>2) {
       points.tail.init.sliding(2).foreach{
         case Seq(p1,p2) => g2d.draw(new Line2D.Double(p1,p2))
         case _=>
       }
+    }
+    
   }
   def interpolate(points:Seq[Point2D],g2d:Graphics2D):Unit = {
     g2d.setColor(inBetweenColor)
-    if(points.length>=2)
-      points.sliding(2).foreach{case Seq(p1,p2) => g2d.draw(new Line2D.Double(p1,p2))}
+    if(points.length>2) {
+      //points.sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
+      cardinalSplineCurve(points,scale = .3).sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
+    }
+  }
+  def cardinalSpline( p0:vec2, p1:vec2, v0:vec2, v1:vec2, scale:Double, t:Double):vec2 ={
+    val points = DenseMatrix(p0, v0, p1, v1)
+    /*
+    * vec4(1,0,0,0),
+      vec4(-s,0,s,0),
+      vec4(2.*s,s-3.,3.-2.*s,-s),
+      vec4(-s,2.-s,s-2.,s)
+    * */
+    val cardinalMatrix = DenseMatrix(
+      (1.0,0.0,0.0,0.0),
+      (-scale,0.0, scale,0.0),
+      (2.0* scale, scale -3.0,3.0 - 2.0 * scale, -scale),
+      (-scale,2.0 - scale, scale -2.0, scale)
+      )
+    val powers = DenseMatrix((1.0,t,t*t,t*t*t))
+    
+    val result =  powers * cardinalMatrix * points
+    
+    (result.apply(0,0),result.apply(0,1))
+  }
+  def mirrorPoint(mirror:vec2,mirrored:vec2, scale:Double):vec2={
+    val v = (mirror._1 - mirrored._1,mirror._2 - mirrored._2)
+    val l = sqrt(v._1*v._1 + v._2*v._2)
+    val nv = (v._1/l, v._2/l)
+    (nv._1*scale,nv._2*scale)
+  }
+  
+  def cardinalSplineCurve( points:Seq[Point2D], scale:Double):Seq[Point2D] = {
+    if(points.length>2) {
+      val pts = points.map(p => (p.getX, p.getY))
+      var cardinalSplineVelocities =
+        pts
+          .sliding(3)
+          .map { case Seq(t, _, h) => (t._1 - h._1, t._2 - h._2) }.toSeq
+      cardinalSplineVelocities = cardinalSplineVelocities
+        .appended((1.0,0.0))
+        .prepended((1.0,0.0))
+      val ttt = tt(100)
+      val input = pts.zip(cardinalSplineVelocities)
+      input
+        .sliding(2)
+        .flatMap {
+          pair =>
+            val ((p0,v0),(p1,v1)) = (pair.head,pair.last)
+            val points = ttt.map(t => cardinalSpline(p0, p1, v0.asInstanceOf[(Double,Double)], v1.asInstanceOf[(Double,Double)], scale, t))
+            points.map(p => new Point2D.Double(p._1, p._2))
+        }.toSeq
+    }else{
+      Seq.empty
+    }
+  }
+  
+  def tt(n:Int):Seq[Double] = for(i<-0 to n) yield 1.0/n * i
+  
+  def interpolationCurve(points:Seq[Point2D]):Seq[Point2D] = {
+    ???
+  }
+  
+  def ermitCurve(points:Seq[Point2D]): Seq[Point2D] ={
+    ???
   }
   
   def drawPoint(point:Point2D,g2d:Graphics2D):Unit = {
@@ -95,7 +162,7 @@ class SplinePlotter extends JPanel{
       g2d.setColor(pointColor)
       pointDrawer(point,g2d)
     }
-    if(points.length>4) {
+    if(points.length>3) {
       g2d.setColor(vectorColor)
       vectorDrawer(points(0), points(1), g2d,points(0))
       g2d.setColor(vectorColor)
@@ -112,7 +179,7 @@ class SplinePlotter extends JPanel{
   object topPanel extends JPanel{
     val interpolationButton = new JButton("INTERPOLATING")
     val ermitButton = new JButton("ERMIT")
-    interpolationButton.addActionListener(_=>{mode = INTERPOLATING;drawer.repaint()})
+    interpolationButton.addActionListener(_=>{mode = NATURAL; drawer.repaint()})
     ermitButton.addActionListener(_=>{mode = ERMIT;drawer.repaint()})
     add(interpolationButton)
     add(ermitButton)
@@ -133,7 +200,7 @@ class SplinePlotter extends JPanel{
       
       val draw = mode match {
         case ERMIT => splineDrawer(drawPoint,drawVector,interpolateErmitLike,pointColor,vectorColor, splineColor, g2d)
-        case INTERPOLATING => splineDrawer(drawPoint,emptyDrawVector,interpolate,pointColor,vectorColor, splineColor, g2d)
+        case NATURAL => splineDrawer(drawPoint, emptyDrawVector, interpolate, pointColor, vectorColor, splineColor, g2d)
       }
         draw(points)
     }

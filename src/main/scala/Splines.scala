@@ -34,7 +34,6 @@ object Splines {
     setMaximumSize(new Dimension(2000,2000))
     setMinimumSize(new Dimension(600,600))
     setPreferredSize(new Dimension(1300,650))
-    
   }
   val frame: JFrame = JFrameBasics.jFrame
   def main( args: Array[ String ] ): Unit = {
