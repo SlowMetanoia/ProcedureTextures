@@ -1,4 +1,4 @@
-import breeze.linalg.{ DenseMatrix, min }
+import breeze.linalg.{ DenseMatrix, DenseVector, min }
 import breeze.numerics.sqrt
 
 import java.awt.event.{ MouseAdapter, MouseEvent }
@@ -107,6 +107,33 @@ class SplinePlotter extends JPanel{
     (p1._1+d._1*1200,p1._2+d._2*1200)
   }
   
+  object SplineFunctions{
+    
+    val zero4: DenseVector[ Double ] = DenseVector.zeros[Double](4)
+    def T(t:Double): DenseVector[ Double ] = DenseVector(1, t, t * t, t * t * t)
+    def dT(t:Double): DenseVector[ Double ] = DenseVector(0, 1, 2 * t, 3 * t * t)
+    def ddT(t:Double): DenseVector[ Double ] = DenseVector(0, 0, 2, 6 * t)
+    def A(ai:Double,bi:Double): DenseMatrix[Double] = DenseMatrix(T(ai),T(bi),dT(bi),ddT(bi)).t
+    def B(ai:Double,bi:Double): DenseMatrix[Double] = DenseMatrix(zero4,zero4,dT(ai),ddT(ai)).t
+    def fC(ai:Double,bi:Double) = ???
+    def hC(ai:Double,bi:Double) = ???
+    def fD(ai:Double,bi:Double) = ???
+    def hD(ai:Double,bi:Double) = ???
+    def U(p0:DenseVector[Double],p1:DenseVector[Double]) = ???
+    def hnU(p0:DenseVector[Double],p1:DenseVector[Double],v0:DenseVector[Double],vn:DenseVector[Double]) = ???
+    def naturalSpline(points:Seq[DenseVector[Double]]):Seq[DenseVector[Double]] = ???
+    def hermitSpline(points:Seq[DenseVector[Double]]):Seq[DenseVector[Double]] = ???
+  }
+  
+  def naturalSpline(points:Seq[Point2D]):DenseMatrix[Double] = {
+    //перевод точек в нормальный человеческий вид(векторы)
+    val pts = points.map(p=> DenseVector(p.getX,p.getY))
+    //левые и правые края промежутков соответственно, узловые точки (a(i),b(i)) - определяют сегмент кривой
+    val a = pts.init
+    val b = pts.tail
+    //
+    ???
+  }
   def cardinalSplineCurve( points:Seq[Point2D], scale:Double):Seq[Point2D] = {
     val n = 100
     if(points.length>2) {
