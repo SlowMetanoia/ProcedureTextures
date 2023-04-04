@@ -1,20 +1,45 @@
-import breeze.linalg.{ DenseMatrix, DenseVector, min }
+import breeze.linalg.{ DenseMatrix, DenseVector, inv, min }
 import breeze.numerics.sqrt
 
 import java.awt.event.{ MouseAdapter, MouseEvent }
 import java.awt.geom.{ Ellipse2D, Line2D, Point2D }
 import java.awt.{ BasicStroke, Color, Graphics, GridBagLayout }
-import javax.swing.{ JButton, JComponent, JPanel }
+import javax.swing.{ JButton, JComponent, JPanel, JTextArea }
 import scala.swing.{ Dimension, Graphics2D }
-
+object testMask {
+  def main( args: Array[ String ] ): Unit = {
+    println(s"matMask(4) = ${ (new SplinePlotter).SplineFunctions.matMask(4) }")
+  }
+}
+object testMap{
+  def main( args: Array[ String ] ): Unit = {
+    val func = (new SplinePlotter).SplineFunctions
+    println(s"maped = ${ func.matMap(func.matMask(4),Map[Int,DenseMatrix[Double]](
+      0->DenseMatrix.zeros(4,4),
+      1->DenseMatrix.fill(4,4)(1),
+      2->DenseMatrix.fill(4,4)(2),
+      3->DenseMatrix.fill(4,4)(3),
+      4->DenseMatrix.fill(4,4)(4)
+      ))
+    }")
+  }
+}
+object funcPointTest{
+  def main( args: Array[ String ] ): Unit = {
+    (new SplinePlotter).SplineFunctions.splineFunc2PointsFunc(Seq(DenseMatrix((1.0,2.0,3.0,4.0), (5.0,6.0,7.0,8.0))))
+  }
+}
 class SplinePlotter extends JPanel{
-  
+  val textField = new JTextArea()
+  textField.setMinimumSize(new Dimension(150,500))
+  textField.setMaximumSize(new Dimension(150,500))
+  textField.setPreferredSize(new Dimension(150,500))
   type vec2 = (Double,Double)
   
   sealed trait SPLINE
   
   sealed trait SPLINE_MODE
-  final object ERMIT extends SPLINE_MODE
+  final object HERMIT extends SPLINE_MODE
   final object NATURAL extends SPLINE_MODE
   
   var mode:SPLINE_MODE = NATURAL
@@ -24,35 +49,47 @@ class SplinePlotter extends JPanel{
   val splineColor: Color = Color.LIGHT_GRAY
   val inBetweenColor: Color = Color.CYAN
   
-  val pointRadius = 15
+  val dLinesColor: Color = Color.BLACK
+  
+  val pointRadius = 10
   
   
   //отрисовываемые точки
-  var points:Seq[Point2D] = /*Seq.empty*/ Seq(
-    new Point2D.Double(100,100),
-    new Point2D.Double(200,400),
-    new Point2D.Double(400, 300)
-  )
+  var points:Seq[Point2D] = Seq.empty
   
   var movingPoint:Option[Int] = None
   
   def interpolateErmitLike(points:Seq[Point2D],g2d:Graphics2D):Unit = {
-    g2d.setColor(inBetweenColor)
-    if(points.length>2) {
-      points.tail.init.sliding(2).foreach{
-        case Seq(p1,p2) => g2d.draw(new Line2D.Double(p1,p2))
-        case _=>
-      }
+    g2d.setColor(splineColor)
+    points.sliding(2).foreach {
+      case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2))
+      case _=>
     }
     
+    if(points.length>4) {
+      g2d.setColor(inBetweenColor)
+      val v0 = DenseVector(points.head.getX - points.tail.head.getX, points.head.getY - points.tail.head.getY) * 15.0
+      val vn = DenseVector(points.last.getX - points.init.last.getX, points.last.getY - points.init.last.getY) * 15.0
+      SplineFunctions.hermitSplineLines(points.init.tail,v0,vn,100).foreach(g2d.draw)
+      val (xn,yn) = (points.init.last.getX,points.init.last.getY)
+      val (x0,y0) = (points.tail.head.getX,points.tail.head.getY)
+      g2d.draw(new Line2D.Double(x0,y0,x0+v0(0)*100,y0+v0(1)*100))
+      g2d.draw(new Line2D.Double(xn,yn,xn+vn(0)*100,yn+vn(1)*100))
+    }
   }
   
   def interpolate(points:Seq[Point2D],g2d:Graphics2D):Unit = {
-    g2d.setColor(inBetweenColor)
+    g2d.setColor(splineColor)
+    points.sliding(2).foreach {
+      case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2))
+      case _=>
+    }
+    
     if(points.length>2) {
-      cardinalSplineCurve(points,scale = .5).sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
-      g2d.setColor(splineColor)
-      //points.sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
+      g2d.setColor(inBetweenColor)
+      //cardinalSplineCurve(points,scale = .5).sliding(2).foreach { case Seq(p1, p2) => g2d.draw(new Line2D.Double(p1, p2)) }
+      SplineFunctions.naturalSplineLines(points,100).foreach(g2d.draw)
+      
     }
   }
   
@@ -110,30 +147,138 @@ class SplinePlotter extends JPanel{
   object SplineFunctions{
     
     val zero4: DenseVector[ Double ] = DenseVector.zeros[Double](4)
+    val zero2: DenseVector[ Double ] = DenseVector.zeros[Double](2)
+    
     def T(t:Double): DenseVector[ Double ] = DenseVector(1, t, t * t, t * t * t)
     def dT(t:Double): DenseVector[ Double ] = DenseVector(0, 1, 2 * t, 3 * t * t)
     def ddT(t:Double): DenseVector[ Double ] = DenseVector(0, 0, 2, 6 * t)
-    def A(ai:Double,bi:Double): DenseMatrix[Double] = DenseMatrix(T(ai),T(bi),dT(bi),ddT(bi)).t
-    def B(ai:Double,bi:Double): DenseMatrix[Double] = DenseMatrix(zero4,zero4,dT(ai),ddT(ai)).t
-    def fC(ai:Double,bi:Double) = ???
-    def hC(ai:Double,bi:Double) = ???
-    def fD(ai:Double,bi:Double) = ???
-    def hD(ai:Double,bi:Double) = ???
-    def U(p0:DenseVector[Double],p1:DenseVector[Double]) = ???
-    def hnU(p0:DenseVector[Double],p1:DenseVector[Double],v0:DenseVector[Double],vn:DenseVector[Double]) = ???
-    def naturalSpline(points:Seq[DenseVector[Double]]):Seq[DenseVector[Double]] = ???
-    def hermitSpline(points:Seq[DenseVector[Double]]):Seq[DenseVector[Double]] = ???
+    
+    def A(ai:Double,bi:Double): DenseMatrix[Double]    = DenseMatrix(T(ai), T(bi), dT(bi),    ddT(bi) ).t
+    def B(ai:Double,bi:Double): DenseMatrix[Double]    = DenseMatrix(zero4, zero4, dT(ai),    ddT(ai) ).t
+    def fC(an:Double,bn:Double): DenseMatrix[ Double ] = DenseMatrix(T(an), T(bn), zero4,     ddT(bn) ).t
+    def hC(an:Double,bn:Double): DenseMatrix[ Double ] = DenseMatrix(T(an), T(bn), zero4,     dT(bn)  ).t
+    def fD(a1:Double,b1:Double): DenseMatrix[ Double ] = DenseMatrix(zero4, zero4, -ddT(a1),  zero4   ).t
+    def hD(a1:Double,b1:Double): DenseMatrix[ Double ] = DenseMatrix(zero4, zero4, -dT(a1),   zero4   ).t
+    
+    def U(p0:DenseVector[Double],p1:DenseVector[Double]): DenseMatrix[ Double ] = DenseMatrix(p0, p1, zero2, zero2).t
+    def hnU( pn1:DenseVector[Double], pn:DenseVector[Double], v0:DenseVector[Double], vn:DenseVector[Double]): DenseMatrix[ Double ] = DenseMatrix(pn1, pn, v0, vn).t
+    
+    def matMask(n:Int): DenseMatrix[Int] ={
+      val zeros = DenseVector.zeros[Int](n).toDenseMatrix
+      val ae = DenseMatrix.eye[Int](n)
+      val be = DenseMatrix.vertcat(zeros,2*ae)
+      val result = ae + be(0 until n, ::)
+      result(0,-1)=4
+      result(-1,-1)=3
+      result
+    }
+    def matMap(mask:DenseMatrix[Int],map:Map[Int,DenseMatrix[Double]]):DenseMatrix[Double] = {
+      val (n,m) = (map.values.head.rows,map.values.head.cols)
+      val (r,c) = (mask.rows,mask.cols)
+      val result = DenseMatrix.zeros[Double](n*r,m*c)
+      for{
+        i<-0 until r
+        j<-0 until c
+        k<-0 until n
+        l<-0 until m
+          }{
+        result(i*n+k,j*m+l) = map(mask(i,j))(k,l)
+      }
+      result
+    }
+    
+    def naturalSpline(points:Seq[DenseVector[Double]]):Seq[DenseMatrix[Double]] = {
+      val segmentNumber = points.length-1
+      
+      //a,b,c,d
+      val a = A(0,1)
+      val b = B(0,1)
+      val c = fC(0,1)
+      val d = fD(0,1)
+      
+      //u
+      val u = points.sliding(2).map{ case Seq(pt0,pt1) => U(pt0,pt1) }.reduce(DenseMatrix.horzcat(_,_))
+
+      //q
+      val mask = matMask(segmentNumber)
+      val map = Map(
+        0->DenseMatrix.zeros[Double](4,4),
+        1->  a,
+        2-> -b,
+        3->  c,
+        4-> -d
+        )
+      val q = matMap(mask, map)
+      //result
+      val result = u*inv(q)
+      //println(s"result = \n${ result }")
+      val out = for(col<-0 until segmentNumber) yield result(::,col*4 until col*4+4)
+      //println(s"out = \n${ out.mkString("\n") }")
+      out
+    }
+    def hermitSpline(points:Seq[DenseVector[Double]],v0:DenseVector[Double],vn:DenseVector[Double]):Seq[DenseMatrix[Double]] = {
+      val segmentNumber = points.length-1
+  
+      //a,b,c,d
+      val a = A(0,1)
+      val b = B(0,1)
+      val c = fC(0,1)
+      val d = fD(0,1)
+  
+      //u
+      val u = points
+        .init
+        .sliding(2)
+        .map{ case Seq(pt0,pt1) => U(pt0,pt1) }
+        .toSeq
+        .appended(hnU(points.init.last,points.last,v0,vn))
+        .reduce(DenseMatrix.horzcat(_,_))
+      
+      //q
+      val mask = matMask(segmentNumber)
+      val map = Map(
+        0->DenseMatrix.zeros[Double](4,4),
+        1->  a,
+        2-> -b,
+        3->  c,
+        4-> -d
+        )
+      val q = matMap(mask, map)
+  
+      //result
+      val result = u*inv(q)
+      //println(s"result = \n${ result }")
+      val out = for(col<-0 until segmentNumber) yield result(::,col*4 until col*4+4)
+      //println(s"out = \n${ out.mkString("\n") }")
+      out
+    }
+    def splineFunc2PointsFunc( coefficients:Seq[DenseMatrix[Double]]):Seq[Double=>Point2D] = {
+      coefficients
+        .map{c=>
+        (t:Double)=> ( c * T(t) ).toScalaVector match {
+          case Vector(x,y) => new Point2D.Double(x,y)
+        }
+      }
+    }
+    
+    def points2Vectors(points:Seq[Point2D]):Seq[DenseVector[Double]] = points.map(pt=>DenseVector(pt.getX,pt.getY))
+    
+    def naturalSplineLines(points:Seq[Point2D],segments:Int): Iterator[Line2D.Double ] = {
+      val range = for(i<-0 to segments) yield i.toDouble / segments
+      splineFunc2PointsFunc(naturalSpline(points2Vectors(points)))
+        .flatMap(f=>range.map(t=>f(t)))
+        .sliding(2)
+        .map{case Seq(pt0,pt1)=>new Line2D.Double(pt0,pt1)}
+    }
+    def hermitSplineLines(points:Seq[Point2D],v0:DenseVector[Double],vn:DenseVector[Double],segments:Int): Iterator[Line2D.Double ] = {
+      val range = for(i<-0 to segments) yield i.toDouble / segments
+      splineFunc2PointsFunc(hermitSpline(points2Vectors(points),v0, vn))
+        .flatMap(f=>range.map(t=>f(t)))
+        .sliding(2)
+        .map{case Seq(pt0,pt1)=>new Line2D.Double(pt0,pt1)}
+    }
   }
   
-  def naturalSpline(points:Seq[Point2D]):DenseMatrix[Double] = {
-    //перевод точек в нормальный человеческий вид(векторы)
-    val pts = points.map(p=> DenseVector(p.getX,p.getY))
-    //левые и правые края промежутков соответственно, узловые точки (a(i),b(i)) - определяют сегмент кривой
-    val a = pts.init
-    val b = pts.tail
-    //
-    ???
-  }
   def cardinalSplineCurve( points:Seq[Point2D], scale:Double):Seq[Point2D] = {
     val n = 100
     if(points.length>2) {
@@ -165,13 +310,6 @@ class SplinePlotter extends JPanel{
   
   def tt(n:Int):Seq[Double] = for(i<-0 to n) yield 1.0/n * i
   
-  def interpolationCurve(points:Seq[Point2D]):Seq[Point2D] = {
-    ???
-  }
-  
-  def ermitCurve(points:Seq[Point2D]): Seq[Point2D] ={
-    ???
-  }
   
   def drawPoint(point:Point2D,g2d:Graphics2D):Unit = {
     val (w,h) = (pointRadius,pointRadius)
@@ -239,9 +377,9 @@ class SplinePlotter extends JPanel{
   val topPanelConstraints = pkg.getConstraints(0,0,1,24)
   object topPanel extends JPanel{
     val interpolationButton = new JButton("INTERPOLATING")
-    val ermitButton = new JButton("ERMIT")
+    val ermitButton = new JButton("HERMIT")
     interpolationButton.addActionListener(_=>{mode = NATURAL; drawer.repaint()})
-    ermitButton.addActionListener(_=>{mode = ERMIT;drawer.repaint()})
+    ermitButton.addActionListener(_=>{mode = HERMIT; drawer.repaint()})
     add(interpolationButton)
     add(ermitButton)
   }
@@ -260,7 +398,7 @@ class SplinePlotter extends JPanel{
       g2d.fillRect(-3000,-3000,6000,6000)
       
       val draw = mode match {
-        case ERMIT => splineDrawer(drawPoint,drawVector,interpolateErmitLike,pointColor,vectorColor, splineColor, g2d)
+        case HERMIT => splineDrawer(drawPoint, drawVector, interpolateErmitLike, pointColor, vectorColor, splineColor, g2d)
         case NATURAL => splineDrawer(drawPoint, emptyDrawVector, interpolate, pointColor, vectorColor, splineColor, g2d)
       }
         draw(points)
@@ -289,6 +427,7 @@ class SplinePlotter extends JPanel{
           }
         }
         repaint()
+        updateTextField()
       }
     })
     addMouseMotionListener(new MouseAdapter {
@@ -298,15 +437,32 @@ class SplinePlotter extends JPanel{
            points = points.updated(i,e.getPoint)
           repaint()
         })
+        updateTextField()
       }
     })
   }
+  def updateTextField(): Unit = {
+    textField.setText(
+      if(mode == HERMIT){
+        val v0 = DenseVector(points.head.getX - points.tail.head.getX, points.head.getY - points.tail.head.getY)
+        val vn = DenseVector(points.last.getX - points.init.last.getX, points.last.getY - points.init.last.getY)
+        s"Velocities:\nv0 = ${(v0(0),v0(1))} * 15.0\nvn = ${(vn(0),vn(1))} * 15.0\n" +
+          s"Points:\n${points.init.tail.map(p=>(p.getX,p.getY)).mkString("\n")}"
+      } else {
+        s"Points:\n${points.map(p=>(p.getX,p.getY)).mkString("\n")}"
+      }
+      )
+  }
   val drawerConstraints = pkg.getConstraints(0,1,12,24)
   add(drawer,drawerConstraints)
+  add(textField)
+  updateTextField()
 }
 
 object SplinePlotter extends App{
   val frame = JFrameBasics.jFrame
-  frame.add(new SplinePlotter)
+  frame.setSize(frame.getWidth+200,frame.getHeight)
+  val plotter = new SplinePlotter
+  frame.add(plotter)
   frame.revalidate()
 }
