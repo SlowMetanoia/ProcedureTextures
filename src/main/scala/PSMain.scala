@@ -13,7 +13,9 @@ object PSMain {
     val f1: Seq[Double] => Double = {
       case Seq(x, y) => x * sin(sin(4 * x)) + 1.1 * y * sin(2 * y)
     }
-
+    val f3:Seq[Double] => Double = {
+      case Seq(x, y) => x*x - 16 + y*y*sin(x*y)*sin(x*y)
+    }
     //    факториал
     def fact:Int=>Int = n=>(1 to n).product
 
@@ -37,7 +39,7 @@ object PSMain {
 
     val sworn:Sworn = new Sworn(
       60,
-      f2,
+      f3,
       Seq.empty,
       start = Seq(10,-0.0005),
       false,

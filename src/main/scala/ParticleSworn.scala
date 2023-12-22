@@ -108,7 +108,7 @@ object ParticleSworn {
       //новое значение
       val value = optimizedFunction(newPosition)
 
-      //обновление локального оптимума
+      //обновление значение локального оптимума
       val (newPBV, newPBP) = updated((pbv, pbp), (value, position))
 
       //обновление глобального оптимума, но только если считанное значение должно быть заменено текущим

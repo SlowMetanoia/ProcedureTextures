@@ -48,9 +48,9 @@ class SwornDrawer(
   }
   val sliders = Seq(
     new SliderInit(0,1000,delay,"Delay",n=>delay=n),
-    new SliderInit(-100,100,(sworn.momentum*100).toInt,"momentum*100",n=>sworn.momentum = n /100.0),
-    new SliderInit(-100,100,(sworn.collectivism*100).toInt,"collectivism*100",n=>sworn.collectivism = n /100.0),
-    new SliderInit(-100,100,(sworn.individualism*100).toInt,"individualism*100",n=>sworn.individualism = n /100.0),
+    new SliderInit(-1000,1000,(sworn.momentum*100).toInt,"momentum*100",n=>sworn.momentum = n /100.0),
+    new SliderInit(-1000,1000,(sworn.collectivism*100).toInt,"collectivism*100",n=>sworn.collectivism = n /100.0),
+    new SliderInit(-1000,1000,(sworn.individualism*100).toInt,"individualism*100",n=>sworn.individualism = n /100.0),
   )
   val slidersPanel: JPanel = pkg.slidersPanel(sliders,"params")
 

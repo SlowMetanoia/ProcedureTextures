@@ -113,10 +113,10 @@ object pkg {
       val outputC = getConstraints(2,1,1,1)
       
       val slider = new JSlider(min,max,defVal)
-      val outLabel = new JLabel(("00" + slider.getValue.toString).takeRight(3))
+      val outLabel = new JLabel(("     " + slider.getValue.toString).takeRight(3))
       
       slider.addChangeListener(_ => se(slider.getValue))
-      slider.addChangeListener(_ => outLabel.setText(("00" + slider.getValue.toString).takeRight(3)))
+      slider.addChangeListener(_ => outLabel.setText(("     " + slider.getValue.toString).takeRight(5)))
       
       panel.add(new Label(label),labelC)
       panel.add(slider,sliderC)
