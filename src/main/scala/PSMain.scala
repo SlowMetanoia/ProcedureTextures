@@ -38,7 +38,7 @@ object PSMain {
     }
 
     val sworn:Sworn = new Sworn(
-      60,
+      1000,
       f3,
       Seq.empty,
       start = Seq(10,-0.0005),

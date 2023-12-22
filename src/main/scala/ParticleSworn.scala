@@ -1,3 +1,6 @@
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.math._
 import scala.util.Random
 
@@ -130,7 +133,14 @@ object ParticleSworn {
     }
 
     def makeStep(): Seq[Particle] = {
-      particleSeries.map(_.next())
+      val future =
+        Future.reduceLeft[Seq[Particle],Seq[Particle]](
+        particleSeries.grouped(10).toSeq
+          .map(
+        part=>Future[Seq[Particle]]{
+          part.map(_.next())
+      }))(_ ++ _)
+      Await.result(future,Duration.Inf)
     }
     def reset():Unit = {
       generalBestPosition = start
